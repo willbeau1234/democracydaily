@@ -11,7 +11,7 @@ import { Toaster } from "@/components/ui/toaster"
 
 // Single opinion piece
 const opinionPiece =
-  "Social media has had a negative impact on society by reducing face-to-face interactions and creating unrealistic expectations."
+  "Just four days ago at Berkshire Hathaway’s annual meeting, Warren Buffett—the “Oracle of Omaha”—announced he’ll step down as CEO at year’s end, closing six decades of unmatched leadership. His disciplined value-investing approach turned early stakes into over 5 million percent return over the course of his life, influenced generations of investors, and was matched by a vast philanthropic pledge. With such a legacy, is Warren Buffett truly the GOAT(greatest of all time) of investing?"
 
 export default function OpinionGame() {
   const [selectedOption, setSelectedOption] = useState<"agree" | "disagree" | null>(null)
