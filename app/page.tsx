@@ -11,7 +11,7 @@ import { Toaster } from "@/components/ui/toaster"
 
 // Single opinion piece
 const opinionPiece =
-  "Just four days ago at Berkshire Hathaway’s annual meeting, Warren Buffett—the “Oracle of Omaha”—announced he’ll step down as CEO at year’s end, closing six decades of unmatched leadership. His disciplined value-investing approach turned early stakes into over 5 million percent return over the course of his life, influenced generations of investors, and was matched by a vast philanthropic pledge. With such a legacy, is Warren Buffett truly the GOAT(greatest of all time) of investing?"
+  "AI has been running around the news and much has been said about its ability to take your job because it can do it better, more efficiently and more cost effectively. If this is all true and it does take our job, what if it replaced our seats of power? If an AI can more effectively govern and create a more idyllic society it is not a moral flaw to not hand over the key of power to that which can govern us better?"
 
 export default function OpinionGame() {
   const [selectedOption, setSelectedOption] = useState<"agree" | "disagree" | null>(null)
