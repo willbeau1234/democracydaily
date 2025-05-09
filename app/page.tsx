@@ -11,8 +11,7 @@ import { Toaster } from "@/components/ui/toaster"
 
 // Single opinion piece
 const opinionPiece =
-  "AI has been running around the news and much has been said about its ability to take your job because it can do it better, more efficiently and more cost effectively. If this is all true and it does take our job, what if it replaced our seats of power? If an AI can more effectively govern and create a more idyllic society it is not a moral flaw to not hand over the key of power to that which can govern us better?"
-
+  "Hey data miners, where's my cut of the gold? 💰Every time you post a brunch pic or take that 'Which potato dish are you?' quiz, tech companies are quietly high-fiving their investors. Your random Tuesday scrolling session is basically an unpaid internship for Silicon Valley billionaires!Mark Zuckerberg is out there buying islands with money made from knowing you binged cat videos at 2am. Meanwhile, you're getting... targeted ads for cat food? What if your phone dinged with actual money notifications instead of just likes? 'Congratulations! Your weird shopping habits earned you $5 today!' Now THAT'S an app notification I wouldn't swipe away.So what do you think? Should companies slip some cash into your digital wallet when they slip your data into theirs?"
 export default function OpinionGame() {
   const [selectedOption, setSelectedOption] = useState<"agree" | "disagree" | null>(null)
   const [reasoning, setReasoning] = useState("")
