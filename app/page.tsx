@@ -1,22 +1,25 @@
-"use client"
+"use client" // Tells Next.js this is a client-side component (needed for hooks like useState)
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import KaraokeText from "@/components/karaoke-text"
-import { Share2, Copy, Twitter, Facebook } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
-import { Toaster } from "@/components/ui/toaster"
-
-// Single opinion piece
+import { useState, useCallback, useMemo, use } from "react"// React hook for state management
+import { Button } from "@/components/ui/button" // Custom button component
+import { Textarea } from "@/components/ui/textarea" // Custom textarea component
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card" // Layout components
+import KaraokeText from "@/components/karaoke-text" // Animated text component for the opinion
+import { Share2, Copy, Twitter, Facebook } from "lucide-react" // Icons used for UI (sharing, copying)
+import { toast } from "@/components/ui/use-toast" // Hook to trigger toast messages
+import { Toaster } from "@/components/ui/toaster" // Renders toast notifications
+// The opinion piece being displayed to the user
 const opinionPiece =
   "Hey data miners, where's my cut of the gold? 💰Every time you post a brunch pic or take that 'Which potato dish are you?' quiz, tech companies are quietly high-fiving their investors. Your random Tuesday scrolling session is basically an unpaid internship for Silicon Valley billionaires!Mark Zuckerberg is out there buying islands with money made from knowing you binged cat videos at 2am. Meanwhile, you're getting... targeted ads for cat food? What if your phone dinged with actual money notifications instead of just likes? 'Congratulations! Your weird shopping habits earned you $5 today!' Now THAT'S an app notification I wouldn't swipe away.So what do you think? Should companies slip some cash into your digital wallet when they slip your data into theirs?"
+
 export default function OpinionGame() {
-  const [selectedOption, setSelectedOption] = useState<"agree" | "disagree" | null>(null)
-  const [reasoning, setReasoning] = useState("")
-  const [isAnimationComplete, setIsAnimationComplete] = useState(false)
-  const [hasSubmitted, setHasSubmitted] = useState(false)
+  const [selectedOption, setSelectedOption] = useState<"agree" | "disagree" | null>(null) // User's choice
+  const [reasoning, setReasoning] = useState("") // User's explanation
+  const [isAnimationComplete, setIsAnimationComplete] = useState(false) // Tracks if karaoke text is done
+  const [hasSubmitted, setHasSubmitted] = useState(false) // Whether user submitted their opinion
+  const [karaokeSpeed, setKaraokeSpeed] = useState(1) // Speed of karaoke text animation 
+
+  // Get today's date in a readable string
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -24,16 +27,19 @@ export default function OpinionGame() {
     day: "numeric",
   })
 
+  // Submit handler: Only allows submission if an option is selected and reasoning is entered
   const handleSubmit = () => {
     if (selectedOption && reasoning.trim()) {
       setHasSubmitted(true)
     }
   }
 
+  // Called once KaraokeText animation is finished
   const handleAnimationComplete = () => {
     setIsAnimationComplete(true)
   }
 
+  // Copies opinion and response to clipboard
   const copyToClipboard = () => {
     const shareText = `THE DEMOCRACY DAILY\nOpinion of the Day: "${opinionPiece}"\n\nMy response: I ${selectedOption} because ${reasoning}`
     navigator.clipboard.writeText(shareText).then(
@@ -53,6 +59,7 @@ export default function OpinionGame() {
     )
   }
 
+  // Opens Twitter share intent in a new tab
   const shareToTwitter = () => {
     const text = encodeURIComponent(
       `THE DEMOCRACY DAILY\nI ${selectedOption} that "${opinionPiece}" because ${reasoning.substring(0, 100)}${reasoning.length > 100 ? "..." : ""}`,
@@ -60,9 +67,8 @@ export default function OpinionGame() {
     window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank")
   }
 
+  // Opens Facebook share URL with current page
   const shareToFacebook = () => {
-    // In a real app, you'd use the Facebook SDK or share API
-    // This is a simplified version
     const url = encodeURIComponent(window.location.href)
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank")
   }
@@ -70,7 +76,7 @@ export default function OpinionGame() {
   return (
     <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">
       <div className="w-full max-w-3xl">
-        {/* Newspaper Header */}
+        {/* Newspaper-style header */}
         <div className="bg-white border-b-4 border-black mb-6 p-6 text-center">
           <h1 className="text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
           <div className="flex justify-between items-center text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-4 my-2">
@@ -80,6 +86,7 @@ export default function OpinionGame() {
           </div>
         </div>
 
+        {/* Main interactive opinion card */}
         <Card className="w-full shadow-lg border-0">
           <CardHeader className="border-b bg-gray-50">
             <CardTitle className="text-center text-2xl font-serif">Opinion of the Day</CardTitle>
@@ -87,12 +94,35 @@ export default function OpinionGame() {
           <CardContent className="space-y-6 p-6">
             {!hasSubmitted ? (
               <>
+                {/* Animated text block */}
                 <div className="min-h-[120px] p-6 bg-white rounded-lg border border-gray-200 font-serif text-lg">
-                  <KaraokeText text={opinionPiece} onComplete={handleAnimationComplete} />
+                  <KaraokeText 
+                    text={opinionPiece}
+                    onComplete={handleAnimationComplete} 
+                    speed = {karaokeSpeed} // <-- pass speed 
+                  />
+                </div>
+                {/* Speed control */}
+                <div className="flex justify-center items-center gap-2">
+                  <label htmlFor="speed" className="text-sm font-medium">
+                    Speed:
+                  </label>
+                  <input
+                    type="range"
+                    id="speed"
+                    min="0.5"
+                    max="2"
+                    step="0.1"
+                    value={karaokeSpeed}
+                    onChange={(e) => setKaraokeSpeed(Number(e.target.value))}
+                    className="w-32"
+                  />
+                  <span className="text-sm">{karaokeSpeed.toFixed(1)}x</span>
                 </div>
 
                 {isAnimationComplete && (
                   <>
+                    {/* Agree/Disagree buttons */}
                     <div className="flex justify-center gap-4 mt-6">
                       <Button
                         variant={selectedOption === "agree" ? "default" : "outline"}
@@ -110,6 +140,7 @@ export default function OpinionGame() {
                       </Button>
                     </div>
 
+                    {/* Reasoning input textarea */}
                     {selectedOption && (
                       <div className="space-y-2">
                         <h3 className="font-medium font-serif text-lg">Why do you {selectedOption}?</h3>
@@ -126,6 +157,7 @@ export default function OpinionGame() {
                 )}
               </>
             ) : (
+              // After submission, show response summary
               <div className="space-y-6">
                 <div className="border rounded-lg p-6 bg-white">
                   <h3 className="font-serif text-xl font-bold mb-3">Today's Opinion</h3>
@@ -146,6 +178,7 @@ export default function OpinionGame() {
                   </div>
                 </div>
 
+                {/* Share options */}
                 <div className="border rounded-lg p-6 bg-white">
                   <h3 className="font-serif text-xl font-bold mb-3 flex items-center gap-2">
                     <Share2 className="h-5 w-5" />
@@ -169,6 +202,8 @@ export default function OpinionGame() {
               </div>
             )}
           </CardContent>
+
+          {/* Footer with submit or reset button */}
           <CardFooter className="flex justify-end border-t bg-gray-50 p-4">
             {!hasSubmitted ? (
               <Button
@@ -194,12 +229,14 @@ export default function OpinionGame() {
           </CardFooter>
         </Card>
 
-        {/* Newspaper Footer */}
+        {/* Newspaper-style footer */}
         <div className="bg-white border-t border-gray-300 mt-6 p-4 text-center text-sm text-gray-600">
           <p>THE DEMOCRACY DAILY - Where Your Voice Matters</p>
           <p className="mt-1">All opinions expressed are subject to public discourse and democratic values.</p>
         </div>
       </div>
+
+      {/* Renders all toasts triggered */}
       <Toaster />
     </div>
   )

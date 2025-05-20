@@ -5,24 +5,24 @@ import { useState, useEffect, useRef } from "react"
 interface KaraokeTextProps {
   text: string
   onComplete: () => void
+  speed?: number
 }
 
-export default function KaraokeText({ text, onComplete }: KaraokeTextProps) {
+export default function KaraokeText({ text, onComplete, speed = 1 }: KaraokeTextProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const words = text.split(" ")
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  useEffect(() => {
-    // Reset when text changes
-    setCurrentIndex(0)
-
-    // Clear any existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-
-    // Start the animation
-    intervalRef.current = setInterval(() => {
+  const speedRef = useRef<number>(speed)
+  const isFirstRenderRef = useRef(true) // Track first render
+  
+  // Function to calculate interval time
+  const getIntervalTime = () => {
+    return 400 / speedRef.current
+  }
+  
+  // Function to create interval with current settings
+  const createInterval = () => {
+    return setInterval(() => {
       setCurrentIndex((prev) => {
         if (prev >= words.length - 1) {
           if (intervalRef.current) {
@@ -33,14 +33,44 @@ export default function KaraokeText({ text, onComplete }: KaraokeTextProps) {
         }
         return prev + 1
       })
-    }, 600) // Adjust speed here
-
+    }, getIntervalTime())
+  }
+  
+  // COMBINED EFFECT: handles both initialization and speed changes
+  useEffect(() => {
+    // Update speed reference
+    speedRef.current = speed
+    
+    // If this is the first render or text changed, reset animation
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false
+      setCurrentIndex(0) // Reset position only on first render or text change
+    }
+    
+    // Always clear existing interval when speed or text changes
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
+    
+    // Create new interval with current speed and continue from current position
+    intervalRef.current = createInterval()
+    
+    // Cleanup
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
     }
-  }, [text, words.length, onComplete])
+  }, [text, speed, words.length, onComplete])
+  
+  // Effect to reset animation when text changes
+  useEffect(() => {
+    // Reset state and ref when text changes
+    setCurrentIndex(0)
+    isFirstRenderRef.current = true
+    
+    // No need to handle intervals here - the combined effect will do that
+  }, [text])
 
   return (
     <div className="text-xl leading-relaxed">
