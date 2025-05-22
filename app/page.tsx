@@ -7,6 +7,9 @@ import { Toaster } from "@/components/ui/toaster" // Renders toast notifications
 
 import { db } from '../firebase'; // import the Firestore instance
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { Timestamp } from "firebase/firestore"
+
 import { v4 as uuidv4 } from "uuid";  // Import the uuid function
 
 import SharePanel from "@/components/SharePanel"
@@ -14,8 +17,8 @@ import OpinionDisplay from "@/components/OpinionDisplay"
 import OpinionSummary from "@/components/OpinionSummary"
 
 // The opinion piece being displayed to the user
-const opinionPiece =
-  "Hey data miners,..."
+// const opinionPiece =
+//   "Hey data miners,..."
 
 export default function OpinionGame() {
 
@@ -26,12 +29,45 @@ export default function OpinionGame() {
   const [karaokeSpeed, setKaraokeSpeed] = useState(1);
   const [loading, setLoading] = useState(false);
 
+  const [opinionPiece, setOpinionPiece] = useState<string>("")
+
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   })
+
+  useEffect(() => {
+    const fetchTodaysQuestion = async () => {
+      try {
+        const now = new Date()
+        const startOfDay = new Date(now.setHours(0, 0, 0, 0))
+        const endOfDay = new Date(now.setHours(23, 59, 59, 999))
+
+        const questionsRef = collection(db, "questions")
+        const q = query(
+          questionsRef,
+          where("date", ">=", Timestamp.fromDate(startOfDay)),
+          where("date", "<=", Timestamp.fromDate(endOfDay))
+        )
+
+        const snapshot = await getDocs(q)
+
+        if (!snapshot.empty) {
+          const docData = snapshot.docs[0].data()
+          setOpinionPiece(docData.question)
+        } else {
+          console.warn("No question found for today.")
+        }
+      } catch (error) {
+        console.error("Error fetching today's question:", error)
+      }
+    }
+
+    fetchTodaysQuestion()
+  }, [])
+
 
   useEffect(() => {
     const checkIfAlreadySubmitted = async () => {
