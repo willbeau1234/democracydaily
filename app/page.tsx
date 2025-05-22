@@ -1,5 +1,6 @@
 "use client"
 
+<<<<<<< Updated upstream
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -10,6 +11,22 @@ import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 
 // Single opinion piece
+=======
+import { useState, useCallback, useMemo, use } from "react"// React hook for state management
+import { Button } from "@/components/ui/button" // Custom button component
+import { Textarea } from "@/components/ui/textarea" // Custom textarea component
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card" // Layout components
+import KaraokeText from "@/components/karaoke-text" // Animated text component for the opinion
+import { Share2, Copy, Twitter, Facebook } from "lucide-react" // Icons used for UI (sharing, copying)
+import { toast } from "@/components/ui/use-toast" // Hook to trigger toast messages
+import { Toaster } from "@/components/ui/toaster" // Renders toast notifications
+
+import { db } from '../firebase'; // import the Firestore instance
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { v4 as uuidv4 } from "uuid";  // Import the uuid function
+
+// The opinion piece being displayed to the user
+>>>>>>> Stashed changes
 const opinionPiece =
   "Hey data miners, where's my cut of the gold? 💰Every time you post a brunch pic or take that 'Which potato dish are you?' quiz, tech companies are quietly high-fiving their investors. Your random Tuesday scrolling session is basically an unpaid internship for Silicon Valley billionaires!Mark Zuckerberg is out there buying islands with money made from knowing you binged cat videos at 2am. Meanwhile, you're getting... targeted ads for cat food? What if your phone dinged with actual money notifications instead of just likes? 'Congratulations! Your weird shopping habits earned you $5 today!' Now THAT'S an app notification I wouldn't swipe away.So what do you think? Should companies slip some cash into your digital wallet when they slip your data into theirs?"
 export default function OpinionGame() {
@@ -24,10 +41,45 @@ export default function OpinionGame() {
     day: "numeric",
   })
 
+<<<<<<< Updated upstream
   const handleSubmit = () => {
+=======
+  // Submit handler: Only allows submission if an option is selected and reasoning is entered
+  const handleSubmit = async () => {
+>>>>>>> Stashed changes
     if (selectedOption && reasoning.trim()) {
-      setHasSubmitted(true)
+      const userId = getOrCreateUserId(); // Get or create user ID
+      const today = new Date().toISOString().split("T")[0]; // Get today's date
+      const docId = `${userId}_${today}`; // Document ID will be uniqeu for each user per day
+
+      const docRef = doc(db, "opinions", docId); // Firestore document reference
+
+      // Check if the user has already submitted an opinion today (TODO: YOU NEED TO UPDATED THIS! IT WILL KEEP READING THE PROMPT BUT ID SUGGEST SOME MESSAGE BEFORE)
+      const existingDoc = await getDoc(docRef);
+      if (existingDoc.exists()) {
+        alert("You've already answered today.");
+        return;
+      }
+
+      // Save the user's response to Firestore
+      await setDoc(docRef, {
+        userId,
+        selectedOption,
+        reasoning,
+        date: today,
+        timestamp: serverTimestamp(),
+      });
+
+      setHasSubmitted(true); // Update state to reflect submission (TODO: THIS IS THE INDICATION YOU SHOULD USE TO CHANGE THE VIEW OF THE PAGE ONCE SUBMITTED)
     }
+  };
+  function getOrCreateUserId() {
+    let id = localStorage.getItem("anonUserId");
+    if (!id) {
+      id = uuidv4();  // Generate unique IDs
+      localStorage.setItem("anonUserId", id);
+    }
+    return id;
   }
 
   const handleAnimationComplete = () => {
@@ -88,7 +140,32 @@ export default function OpinionGame() {
             {!hasSubmitted ? (
               <>
                 <div className="min-h-[120px] p-6 bg-white rounded-lg border border-gray-200 font-serif text-lg">
+<<<<<<< Updated upstream
                   <KaraokeText text={opinionPiece} onComplete={handleAnimationComplete} />
+=======
+                  <KaraokeText
+                    text={opinionPiece}
+                    onComplete={handleAnimationComplete}
+                    speed={karaokeSpeed} // <-- pass speed 
+                  />
+                </div>
+                {/* Speed control */}
+                <div className="flex justify-center items-center gap-2">
+                  <label htmlFor="speed" className="text-sm font-medium">
+                    Speed:
+                  </label>
+                  <input
+                    type="range"
+                    id="speed"
+                    min="0.5"
+                    max="2"
+                    step="0.1"
+                    value={karaokeSpeed}
+                    onChange={(e) => setKaraokeSpeed(Number(e.target.value))}
+                    className="w-32"
+                  />
+                  <span className="text-sm">{karaokeSpeed.toFixed(1)}x</span>
+>>>>>>> Stashed changes
                 </div>
 
                 {isAnimationComplete && (
@@ -133,9 +210,8 @@ export default function OpinionGame() {
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-sm font-semibold">Your stance:</span>
                     <span
-                      className={`px-2 py-1 rounded text-sm ${
-                        selectedOption === "agree" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                      }`}
+                      className={`px-2 py-1 rounded text-sm ${selectedOption === "agree" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        }`}
                     >
                       {selectedOption === "agree" ? "Agree" : "Disagree"}
                     </span>
