@@ -1,24 +1,105 @@
 "use client" // Tells Next.js this is a client-side component (needed for hooks like useState)
 
-import { useState, useCallback, useMemo, use } from "react"// React hook for state management
+import { useState, useCallback, useMemo, use, useEffect } from "react"// React hook for state management
 import { Button } from "@/components/ui/button" // Custom button component
 import { Textarea } from "@/components/ui/textarea" // Custom textarea component
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card" // Layout components
 import KaraokeText from "@/components/karaoke-text" // Animated text component for the opinion
+import WordCloud from "@/components/word-cloud" // Animated text component for the opinion
 import { Share2, Copy, Twitter, Facebook } from "lucide-react" // Icons used for UI (sharing, copying)
 import { toast } from "@/components/ui/use-toast" // Hook to trigger toast messages
 import { Toaster } from "@/components/ui/toaster" // Renders toast notifications
-// The opinion piece being displayed to the user
-const opinionPiece =
-  "Hey data miners, where's my cut of the gold? 💰Every time you post a brunch pic or take that 'Which potato dish are you?' quiz, tech companies are quietly high-fiving their investors. Your random Tuesday scrolling session is basically an unpaid internship for Silicon Valley billionaires!Mark Zuckerberg is out there buying islands with money made from knowing you binged cat videos at 2am. Meanwhile, you're getting... targeted ads for cat food? What if your phone dinged with actual money notifications instead of just likes? 'Congratulations! Your weird shopping habits earned you $5 today!' Now THAT'S an app notification I wouldn't swipe away.So what do you think? Should companies slip some cash into your digital wallet when they slip your data into theirs?"
+import { db } from '@/lib/firebase'; // import the Firestore instance
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { v4 as uuidv4 } from "uuid";  // Import the uuid function
+import { getTodayOpinion } from "@/lib/firebase";
+import { collection, addDoc } from 'firebase/firestore';
+
+
+// The opinion piece being displayed to the usern 
+// TODO: WILL- FOR THE opinionPiece variable, you could have it pulled from a databse in firebase. that way you just update in firestore and you dont have to push a new thing everyday)
+// you could set up a databse with a 100 questions and a date to publish. then it will pull that days question automatically at midnight.
+//const opinionPiece =
+//  "Hey data miners, where's my cut of the gold? 💰Every time you post a brunch pic or take that 'Which potato dish are you?' quiz, tech companies are quietly high-fiving their investors. Your random Tuesday scrolling session is basically an unpaid internship for Silicon Valley billionaires!Mark Zuckerberg is out there buying islands with money made from knowing you binged cat videos at 2am. Meanwhile, you're getting... targeted ads for cat food? What if your phone dinged with actual money notifications instead of just likes? 'Congratulations! Your weird shopping habits earned you $5 today!' Now THAT'S an app notification I wouldn't swipe away.So what do you think? Should companies slip some cash into your digital wallet when they slip your data into theirs?"
+
 
 export default function OpinionGame() {
   const [selectedOption, setSelectedOption] = useState<"agree" | "disagree" | null>(null) // User's choice
+  const [gaveOption, setGaveOption] = useState(false) // User's choice
   const [reasoning, setReasoning] = useState("") // User's explanation
   const [isAnimationComplete, setIsAnimationComplete] = useState(false) // Tracks if karaoke text is done
   const [hasSubmitted, setHasSubmitted] = useState(false) // Whether user submitted their opinion
   const [karaokeSpeed, setKaraokeSpeed] = useState(1) // Speed of karaoke text animation 
+  const [opinionPiece, setOpinionPiece] = useState("")
+  const [loadingOpinion, setLoadingOpinion] = useState(true)
 
+  useEffect(() => {
+    async function loadOpinion() {
+      try {
+        const todayOpinion = await getTodayOpinion()
+        if (todayOpinion) {
+          setOpinionPiece(todayOpinion.content)
+        } else {
+          // Fallback if no opinion for today
+          setOpinionPiece("No opinion available for today. Check back tomorrow!")
+        }
+      } catch (error) {
+        console.error("Error loading opinion:", error)
+        setOpinionPiece("Error loading today's opinion. Please refresh the page.")
+      } finally {
+        setLoadingOpinion(false)
+      }
+    }
+    
+    loadOpinion()
+  }, [])
+  function getOrCreateUserId() {
+    let id = localStorage.getItem("anonUserId");
+    if (!id) {
+      id = uuidv4();  // Generate unique IDs
+      localStorage.setItem("anonUserId", id);
+    }
+    return id;
+  }
+  // Submit handler: Only allows submission if an option is selected and reasoning is entered
+  const handleSubmit = async () => {
+    if (selectedOption && reasoning.trim()) {
+      try {
+        const userId = getOrCreateUserId(); // Keep your existing user ID logic
+        const today = new Date().toISOString().split("T")[0]; // Today's date
+        
+        // Create the response data
+        const responseData = {
+          opinionId: today, // Links to the opinion document (e.g., "2025-05-31")
+          stance: selectedOption, // "agree" or "disagree"
+          reasoning: reasoning.trim(),
+          timestamp: serverTimestamp(),
+          userId: userId, // Optional: track anonymous users
+        };
+  
+        // Save to the "responses" collection (not "opinions")
+        const responsesRef = collection(db, "responses");
+        await addDoc(responsesRef, responseData);
+  
+        console.log("Response submitted successfully!");
+        setHasSubmitted(false);
+        
+        // Show success message
+        toast({
+          title: "Opinion submitted!",
+          description: "Thank you for sharing your thoughts.",
+        });
+  
+      } catch (error) {
+        console.error("Error submitting response:", error);
+        toast({
+          title: "Submission failed",
+          description: "Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
   // Get today's date in a readable string
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -27,12 +108,6 @@ export default function OpinionGame() {
     day: "numeric",
   })
 
-  // Submit handler: Only allows submission if an option is selected and reasoning is entered
-  const handleSubmit = () => {
-    if (selectedOption && reasoning.trim()) {
-      setHasSubmitted(true)
-    }
-  }
 
   // Called once KaraokeText animation is finished
   const handleAnimationComplete = () => {
@@ -96,10 +171,10 @@ export default function OpinionGame() {
               <>
                 {/* Animated text block */}
                 <div className="min-h-[120px] p-6 bg-white rounded-lg border border-gray-200 font-serif text-lg">
-                  <KaraokeText 
+                  <KaraokeText
                     text={opinionPiece}
-                    onComplete={handleAnimationComplete} 
-                    speed = {karaokeSpeed} // <-- pass speed 
+                    onComplete={handleAnimationComplete}
+                    speed={karaokeSpeed} // <-- pass speed 
                   />
                 </div>
                 {/* Speed control */}
@@ -150,9 +225,26 @@ export default function OpinionGame() {
                           onChange={(e) => setReasoning(e.target.value)}
                           rows={4}
                           className="font-serif"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setGaveOption(true)
+                            }
+                          }}
+                          
                         />
                       </div>
                     )}
+                    {gaveOption && (
+                      <div className="space-y-2">
+                        <WordCloud
+                          text={reasoning}
+                        
+                        />
+                       
+                        
+                      </div>
+                    )}
+
                   </>
                 )}
               </>
@@ -165,9 +257,8 @@ export default function OpinionGame() {
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-sm font-semibold">Your stance:</span>
                     <span
-                      className={`px-2 py-1 rounded text-sm ${
-                        selectedOption === "agree" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                      }`}
+                      className={`px-2 py-1 rounded text-sm ${selectedOption === "agree" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        }`}
                     >
                       {selectedOption === "agree" ? "Agree" : "Disagree"}
                     </span>
