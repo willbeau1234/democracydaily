@@ -12,7 +12,7 @@ import { Toaster } from "@/components/ui/toaster" // Renders toast notifications
 import { db } from '@/lib/firebase'; // import the Firestore instance
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from "uuid";  // Import the uuid function
-import { getTodayOpinion } from "@/lib/firebase";
+import { getTodayOpinion, getOpinionStats, OpinionStats } from "@/lib/firebase";
 import { collection, addDoc } from 'firebase/firestore';
 
 
@@ -71,7 +71,7 @@ export default function OpinionGame() {
         // Create the response data
         const responseData = {
           opinionId: today, // Links to the opinion document (e.g., "2025-05-31")
-          stance: selectedOption, // "agree" or "disagree"
+          stance: selectedOption,
           reasoning: reasoning.trim(),
           timestamp: serverTimestamp(),
           userId: userId, // Optional: track anonymous users
@@ -82,7 +82,8 @@ export default function OpinionGame() {
         await addDoc(responsesRef, responseData);
   
         console.log("Response submitted successfully!");
-        setHasSubmitted(false);
+        setHasSubmitted(true);
+        await loadStats();
         
         // Show success message
         toast({
@@ -107,12 +108,28 @@ export default function OpinionGame() {
     month: "long",
     day: "numeric",
   })
+  const [stats, setStats] = useState<OpinionStats | null>(null);
+
+  const loadStats = async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const opinionStats = await getOpinionStats(today);
+      setStats(opinionStats);
+    } catch (error) {
+      console.error("Error loading stats:", error);
+    }
+  };
 
 
   // Called once KaraokeText animation is finished
   const handleAnimationComplete = () => {
     setIsAnimationComplete(true)
   }
+  useEffect(() => {
+    if (isAnimationComplete) {
+      loadStats();
+    }
+  }, [isAnimationComplete, loadStats]);
 
   // Copies opinion and response to clipboard
   const copyToClipboard = () => {
@@ -215,6 +232,7 @@ export default function OpinionGame() {
                       </Button>
                     </div>
 
+
                     {/* Reasoning input textarea */}
                     {selectedOption && (
                       <div className="space-y-2">
@@ -290,8 +308,67 @@ export default function OpinionGame() {
                     </Button>
                   </div>
                 </div>
+                {stats && (
+                  <div className="border rounded-lg p-6 bg-gray-50">
+                    <h3 className="font-serif text-xl font-bold mb-4 text-center">Community Pulse</h3>
+                    
+                    {/* The Progress Bar */}
+                    <div className="mb-4">
+                      <div className="flex h-8 rounded-lg overflow-hidden border-2 border-gray-300">
+                        {/* Green (Agree) section */}
+                        <div 
+                          className="bg-green-500 flex items-center justify-center text-white font-semibold text-sm transition-all duration-500"
+                          style={{ width: `${stats.agreePercentage}%` }}
+                        >
+                          {stats.agreePercentage > 15 && `${stats.agreePercentage}%`}
+                        </div>
+                        
+                        {/* Red (Disagree) section */}
+                        <div 
+                          className="bg-red-500 flex items-center justify-center text-white font-semibold text-sm transition-all duration-500"
+                          style={{ width: `${stats.disagreePercentage}%` }}
+                        >
+                          {stats.disagreePercentage > 15 && `${stats.disagreePercentage}%`}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stats breakdown */}
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-green-500 rounded"></div>
+                        {stats.agreeCount} Agree
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <div className="w-3 h-3 bg-red-500 rounded"></div>
+                        {stats.disagreeCount} Disagree
+                      </span>
+                    </div>
+
+                    {/* Trend message */}
+                    <div className="text-center">
+                      <p className="font-semibold text-lg">
+                        {stats.agreePercentage > 60 && (
+                          <span className="text-green-600">📈 People are mostly agreeing!</span>
+                        )}
+                        {stats.agreePercentage < 40 && (
+                          <span className="text-red-600">📉 People are mostly disagreeing!</span>
+                        )}
+                        {stats.agreePercentage >= 40 && stats.agreePercentage <= 60 && (
+                          <span className="text-gray-600">⚖️ It's a close split!</span>
+                        )}
+                      </p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Based on {stats.totalResponses} {stats.totalResponses === 1 ? 'response' : 'responses'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {/* END OF PROGRESS BAR */}
+
               </div>
             )}
+            
           </CardContent>
 
           {/* Footer with submit or reset button */}

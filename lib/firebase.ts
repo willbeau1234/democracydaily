@@ -47,14 +47,14 @@ export async function getTodayOpinion(): Promise<Opinion | null> {
 export interface UserResponse {
   id: string;
   opinionId: string;
-  stance: boolean; // true = agree, false = disagree
+  stance: 'agree' | 'disagree';
   reasoning: string;
   timestamp: Date;
 }
 
 export async function submitResponse(
   opinionId: string, 
-  stance: boolean,
+  stance: 'agree' | 'disagree', 
   reasoning: string
 ): Promise<boolean> {
   try {
@@ -74,4 +74,46 @@ export async function submitResponse(
     console.error("Error submitting response:", error);
     return false;
   }
+}
+export interface OpinionStats {
+  agreeCount: number;
+  disagreeCount: number;
+  totalResponses: number;
+  agreePercentage: number;
+  disagreePercentage: number;
+}
+export async function getOpinionStats(opinionId: string): Promise<OpinionStats> {
+  console.log("Looking for responses with opinionId:", opinionId); // Debug log
+  
+  const responsesRef = collection(db, "responses");
+  const q = query(responsesRef, where("opinionId", "==", opinionId));
+  const querySnapshot = await getDocs(q);
+  
+  console.log("Found", querySnapshot.size, "responses"); // Debug log
+  
+  let agreeCount = 0;
+  let disagreeCount = 0;
+  
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    console.log("Response:", data); // Debug log
+    if (data.stance === "agree") {
+      agreeCount++;
+    } else if (data.stance === "disagree") {
+      disagreeCount++;
+    }
+  });
+  
+  const totalResponses = agreeCount + disagreeCount;
+  const agreePercentage = totalResponses > 0 ? Math.round((agreeCount / totalResponses) * 100) : 0;
+  
+  console.log("Final stats:", { agreeCount, disagreeCount, agreePercentage }); // Debug log
+  
+  return {
+    agreeCount,
+    disagreeCount,
+    totalResponses,
+    agreePercentage,
+    disagreePercentage: 100 - agreePercentage
+  };
 }
