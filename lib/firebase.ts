@@ -125,6 +125,7 @@ export async function getOpinionStats(opinionId: string): Promise<OpinionStats> 
   };
 }
 
+
 // NEW: Real-time stats hook
 export function useRealTimeStats(opinionId: string) {
   const [stats, setStats] = useState<OpinionStats | null>(null);
@@ -270,5 +271,35 @@ export async function getReasoningByStance(opinionId: string): Promise<Separated
   } catch (error) {
     console.error("Error getting reasoning by stance:", error);
     return { agreeReasons: [], disagreeReasons: [] };
+  }
+}
+// Add this new function to fetch user's actual response
+export async function getUserResponse(userId: string, opinionId: string): Promise<UserResponse | null> {
+  try {
+    const responsesRef = collection(db, "responses");
+    const q = query(
+      responsesRef, 
+      where("userId", "==", userId),
+      where("opinionId", "==", opinionId)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
+      
+      return {
+        id: userDoc.id,
+        opinionId: userData.opinionId,
+        stance: userData.stance,
+        reasoning: userData.reasoning,
+        timestamp: userData.timestamp
+      } as UserResponse;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error fetching user response:", error);
+    return null;
   }
 }

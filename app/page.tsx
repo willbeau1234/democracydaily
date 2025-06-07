@@ -11,7 +11,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from "uuid";
-import { getTodayOpinion, getOpinionStats, OpinionStats, useRealTimeStats, useRealTimeWordCloud } from "@/lib/firebase";
+import { getTodayOpinion, getOpinionStats, OpinionStats, useRealTimeStats, useRealTimeWordCloud, getUserResponse } from "@/lib/firebase";
 import { collection, addDoc } from 'firebase/firestore';
 import { query, where, getDocs } from 'firebase/firestore';
 
@@ -276,6 +276,50 @@ export default function OpinionGame() {
   const [karaokeSpeed, setKaraokeSpeed] = useState(1)
   const [opinionPiece, setOpinionPiece] = useState("")
   const [loadingOpinion, setLoadingOpinion] = useState(true)
+  const [userOriginalResponse, setUserOriginalResponse] = useState<{
+    stance: 'agree' | 'disagree';
+    reasoning: string;
+  } | null>(null);
+  const [hasAlreadySubmitted, setHasAlreadySubmitted] = useState(false);
+  const [stats, setStats] = useState<OpinionStats | null>(null);
+
+  // Use real-time stats
+  const today = new Date().toISOString().split("T")[0];
+  const { stats: realtimeStats } = useRealTimeStats(today);
+
+  function getOrCreateUserId() {
+    let id = localStorage.getItem("anonUserId");
+    if (!id) {
+      id = uuidv4();
+      localStorage.setItem("anonUserId", id);
+    }
+    return id;
+  }
+
+  // Define the fetchUserResponse function
+  const fetchUserResponse = async () => {
+    try {
+      const userId = getOrCreateUserId();
+      const today = new Date().toISOString().split("T")[0];
+      
+      const userResponse = await getUserResponse(userId, today);
+      
+      if (userResponse) {
+        setUserOriginalResponse({
+          stance: userResponse.stance,
+          reasoning: userResponse.reasoning
+        });
+        setSelectedOption(userResponse.stance);
+        setReasoning(userResponse.reasoning);
+      }
+    } catch (error) {
+      console.error("Error fetching user response:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserResponse();
+  }, []);
 
   useEffect(() => {
     async function loadOpinion() {
@@ -296,15 +340,6 @@ export default function OpinionGame() {
     
     loadOpinion()
   }, [])
-
-  function getOrCreateUserId() {
-    let id = localStorage.getItem("anonUserId");
-    if (!id) {
-      id = uuidv4();
-      localStorage.setItem("anonUserId", id);
-    }
-    return id;
-  }
 
   // Updated to use new Cloud Function
   const handleSubmit = async () => {
@@ -360,12 +395,6 @@ export default function OpinionGame() {
     day: "numeric",
   })
 
-  const [stats, setStats] = useState<OpinionStats | null>(null);
-  
-  // Use real-time stats
-  const today = new Date().toISOString().split("T")[0];
-  const { stats: realtimeStats } = useRealTimeStats(today);
-
   const loadStats = async () => {
     try {
       const today = new Date().toISOString().split("T")[0];
@@ -407,8 +436,6 @@ export default function OpinionGame() {
       },
     )
   }
-
-  const [hasAlreadySubmitted, setHasAlreadySubmitted] = useState(false);
   
   const checkIfAlreadySubmitted = async () => {
     try {
@@ -618,7 +645,7 @@ export default function OpinionGame() {
                   </div>
                 )}
 
-                {/* NEW: Dynamic Word Clouds */}
+                {/* Dynamic Word Clouds */}
                 <div className="space-y-4">
                   <h3 className="font-serif text-xl font-bold text-center">Live Word Clouds</h3>
                   <div className="grid md:grid-cols-2 gap-6">
@@ -637,7 +664,10 @@ export default function OpinionGame() {
                   <p className="text-gray-600 mb-2">You've already submitted your opinion for today!</p>
                   <p className="text-sm text-gray-500">Come back tomorrow for a new question.</p>
                   <Button
-                    onClick={() => setHasSubmitted(true)}
+                    onClick={async () => {
+                      await fetchUserResponse();
+                      setHasSubmitted(true);
+                    }}
                     className="bg-gray-900 hover:bg-black"
                   >
                     View My Response
