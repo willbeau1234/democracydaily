@@ -2,88 +2,105 @@
 
 import { useState, useEffect, useRef } from "react"
 
-interface KaraokeTextProps {
+interface TypewriterTextProps {
   text: string
   onComplete: () => void
   speed?: number
 }
 
-export default function KaraokeText({ text, onComplete, speed = 1 }: KaraokeTextProps) {
+export default function TypewriterText({ text, onComplete, speed = 1 }: TypewriterTextProps) {
+  const [displayedText, setDisplayedText] = useState("")
   const [currentIndex, setCurrentIndex] = useState(0)
-  const words = text.split(" ")
+  const [showCursor, setShowCursor] = useState(true)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const cursorIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const speedRef = useRef<number>(speed)
-  const isFirstRenderRef = useRef(true) // Track first render
-  
-  // Function to calculate interval time
-  const getIntervalTime = () => {
-    return 400 / speedRef.current
+  const isFirstRenderRef = useRef(true)
+
+  // Safe text handling
+  const safeText = text || ""
+
+  // Function to calculate typing speed (characters per interval)
+  const getTypingSpeed = () => {
+    return Math.max(30, 100 / speedRef.current) // Faster = lower interval time
   }
-  
-  // Function to create interval with current settings
-  const createInterval = () => {
-    return setInterval(() => {
-      setCurrentIndex((prev) => {
-        if (prev >= words.length - 1) {
+
+  // Blinking cursor effect
+  useEffect(() => {
+    cursorIntervalRef.current = setInterval(() => {
+      setShowCursor(prev => !prev)
+    }, 530) // Blink every 530ms
+
+    return () => {
+      if (cursorIntervalRef.current) {
+        clearInterval(cursorIntervalRef.current)
+      }
+    }
+  }, [])
+
+  // Main typewriter effect
+  useEffect(() => {
+    if (!safeText) return; // Don't start if no text
+    
+    speedRef.current = speed
+
+    // Reset on first render or text change
+    if (isFirstRenderRef.current || safeText !== displayedText.substring(0, safeText.length)) {
+      isFirstRenderRef.current = false
+      setCurrentIndex(0)
+      setDisplayedText("")
+    }
+
+    // Clear existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+    }
+
+    // Start typewriter animation
+    intervalRef.current = setInterval(() => {
+      setCurrentIndex((prevIndex) => {
+        const nextIndex = prevIndex + 1
+        
+        if (nextIndex > safeText.length) {
           if (intervalRef.current) {
             clearInterval(intervalRef.current)
           }
           onComplete()
-          return prev
+          return prevIndex
         }
-        return prev + 1
+
+        setDisplayedText(safeText.substring(0, nextIndex))
+        return nextIndex
       })
-    }, getIntervalTime())
-  }
-  
-  // COMBINED EFFECT: handles both initialization and speed changes
-  useEffect(() => {
-    // Update speed reference
-    speedRef.current = speed
-    
-    // If this is the first render or text changed, reset animation
-    if (isFirstRenderRef.current) {
-      isFirstRenderRef.current = false
-      setCurrentIndex(0) // Reset position only on first render or text change
-    }
-    
-    // Always clear existing interval when speed or text changes
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-    
-    // Create new interval with current speed and continue from current position
-    intervalRef.current = createInterval()
-    
-    // Cleanup
+    }, getTypingSpeed())
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
     }
-  }, [text, speed, words.length, onComplete])
-  
-  // Effect to reset animation when text changes
+  }, [safeText, speed, onComplete])
+
+  // Reset when text changes
   useEffect(() => {
-    // Reset state and ref when text changes
     setCurrentIndex(0)
+    setDisplayedText("")
     isFirstRenderRef.current = true
-    
-    // No need to handle intervals here - the combined effect will do that
-  }, [text])
+  }, [safeText])
 
   return (
-    <div className="text-xl leading-relaxed">
-      {words.map((word, index) => (
-        <span
-          key={index}
-          className={`inline-block mx-1 transition-all duration-300 ${
-            index <= currentIndex ? "text-black font-medium" : "text-gray-400"
-          } ${index === currentIndex ? "transform scale-110 text-gray-900 underline" : ""}`}
-        >
-          {word}
-        </span>
-      ))}
+    <div className="font-serif text-lg leading-relaxed">
+      <span className="inline-block">
+        {displayedText}
+        <span 
+          className={`inline-block w-0.5 h-6 bg-black ml-1 transition-opacity duration-100 ${
+            showCursor ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={{ 
+            animation: currentIndex >= safeText.length ? 'none' : undefined 
+          }}
+        />
+      </span>
     </div>
   )
 }
