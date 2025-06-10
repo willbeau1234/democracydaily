@@ -419,12 +419,20 @@ export default function OpinionGame() {
   const displayStats = realtimeStats || stats;
 
   const copyToClipboard = () => {
-    const shareText = `THE DEMOCRACY DAILY\nOpinion of the Day: "${opinionPiece}"\n\nMy response: I ${selectedOption} because ${reasoning}`
+    const shareText = `🏛️ THE DEMOCRACY DAILY ⚖️
+  📜 Opinion of the Day: "${opinionPiece}"
+  
+  🗳️ My response: I ${selectedOption} because ${reasoning}
+  
+  🗣️ Share your voice: https://thedemocracydaily.com
+  
+  #DemocracyDaily #YourVoiceMatters #CivicEngagement 🏛️`
+  
     navigator.clipboard.writeText(shareText).then(
       () => {
         toast({
-          title: "Copied to clipboard",
-          description: "Your opinion and response have been copied to your clipboard.",
+          title: "Copied to clipboard! 📋",
+          description: "Your democratic voice is ready to share! 🗳️",
         })
       },
       (err) => {
@@ -436,7 +444,6 @@ export default function OpinionGame() {
       },
     )
   }
-  
   const checkIfAlreadySubmitted = async () => {
     try {
       const userId = getOrCreateUserId();

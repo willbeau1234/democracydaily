@@ -30,7 +30,7 @@ export interface Opinion {
 }
 
 export async function getTodayOpinion(): Promise<Opinion | null> {
-  const today = "2025-05-28";
+  const today = new Date().toISOString().split("T")[0];
   const docRef = doc(db, "dailyOpinions", today);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists() && docSnap.data().isActive) {

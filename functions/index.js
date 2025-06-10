@@ -1,14 +1,13 @@
 const functions = require("firebase-functions/v2");
 const admin = require("firebase-admin");
 
-/**
- * Initialize Firebase Admin SDK
- */
+// VERSION: 2024-12-07-DUPLICATE-FIX
 admin.initializeApp();
 const db = admin.firestore();
 
 /**
- * Submit a new response and trigger word cloud updates
+ * Submit a new response and prevent duplicates
+ * Version 2.0 - Fixed duplicate submission bug
  */
 exports.submitResponse = functions.https.onRequest({
   cors: true,
@@ -40,7 +39,45 @@ exports.submitResponse = functions.https.onRequest({
       return;
     }
 
-    // Create response document
+    // CHECK FOR EXISTING RESPONSE TO PREVENT DUPLICATES
+    const responsesRef = db.collection("responses");
+    const existingResponseQuery = responsesRef
+        .where("opinionId", "==", opinionId)
+        .where("userId", "==", userId || "anonymous");
+
+    const existingSnapshot = await existingResponseQuery.get();
+
+    console.log("Checking for existing responses for user:", userId);
+    console.log("Found:", existingSnapshot.size);
+
+    if (!existingSnapshot.empty) {
+      // USER ALREADY RESPONDED - UPDATE INSTEAD OF CREATE NEW
+      const existingDoc = existingSnapshot.docs[0];
+
+      console.log("UPDATING existing response instead of creating new one");
+
+      const updatedData = {
+        stance,
+        reasoning: reasoning.trim(),
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await existingDoc.ref.update(updatedData);
+      await updateOpinionStats(opinionId);
+
+      res.json({
+        success: true,
+        message: "Response updated successfully (no duplicate created)",
+        responseId: existingDoc.id,
+        updated: true,
+      });
+      return;
+    }
+
+    // CREATE NEW RESPONSE (ONLY IF NO EXISTING RESPONSE)
+    console.log("CREATING new response - no existing response found");
+
     const responseData = {
       opinionId,
       stance,
@@ -50,17 +87,14 @@ exports.submitResponse = functions.https.onRequest({
       createdAt: new Date().toISOString(),
     };
 
-    // Add to Firestore (this will trigger real-time listeners)
-    const responsesRef = db.collection("responses");
     const docRef = await responsesRef.add(responseData);
-
-    // Update opinion stats
     await updateOpinionStats(opinionId);
 
     res.json({
       success: true,
-      message: "Response submitted successfully",
+      message: "New response created successfully",
       responseId: docRef.id,
+      updated: false,
     });
   } catch (error) {
     console.error("Error submitting response:", error);
@@ -91,13 +125,11 @@ exports.getAggregatedResponses = functions.https.onRequest({
       return;
     }
 
-    // Query responses from Firestore
     const responsesRef = db.collection("responses");
     const q = responsesRef
         .where("opinionId", "==", opinionId)
         .where("stance", "==", stance)
-        //.orderBy("timestamp", "desc")
-        .limit(500); // Limit for performance
+        .limit(500);
 
     const querySnapshot = await q.get();
 
@@ -115,10 +147,7 @@ exports.getAggregatedResponses = functions.https.onRequest({
       allText.push(data.reasoning);
     });
 
-    // Combine all reasoning text
     const combinedText = allText.join(" ");
-
-    // Process text into word frequencies
     const wordFrequencies = processTextToWordFrequencies(combinedText);
 
     res.json({
@@ -128,7 +157,7 @@ exports.getAggregatedResponses = functions.https.onRequest({
       totalResponses: responses.length,
       combinedText,
       wordFrequencies,
-      responses: responses.slice(0, 10), // Return latest 10 for display
+      responses: responses.slice(0, 10),
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
@@ -190,7 +219,6 @@ exports.getTodayOpinion = functions.https.onRequest({
       return;
     }
 
-    // For demo, using a fixed date - replace with actual logic
     const today = "2025-05-28";
     const opinionRef = db.collection("dailyOpinions").doc(today);
     const opinionDoc = await opinionRef.get();
@@ -251,22 +279,19 @@ function processTextToWordFrequencies(text) {
     "want", "come", "use", "really", "need", "feel", "believe",
   ]);
 
-  // Clean and split text
   const words = text.toLowerCase()
       .replace(/[^\w\s]/g, "")
       .split(/\s+/)
       .filter((word) => word.length > 2 && !stopwords.has(word));
 
-  // Count word frequencies
   const wordCount = {};
   words.forEach((word) => {
     wordCount[word] = (wordCount[word] || 0) + 1;
   });
 
-  // Convert to sorted array
   return Object.entries(wordCount)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 100); // Top 100 words for performance
+      .slice(0, 100);
 }
 
 /**
@@ -313,14 +338,13 @@ async function updateOpinionStats(opinionId) {
   try {
     const stats = await calculateOpinionStats(opinionId);
 
-    // Optionally store stats in a separate collection for quick access
     const statsRef = db.collection("opinionStats").doc(opinionId);
     await statsRef.set({
       ...stats,
       lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
     }, {merge: true});
 
-    console.log(`Updated stats for opinion ${opinionId}:`, stats);
+    console.log("Updated stats for opinion " + opinionId + ":", stats);
   } catch (error) {
     console.error("Error updating opinion stats:", error);
   }
@@ -336,6 +360,97 @@ exports.hellword = functions.https.onRequest(async (req, res) => {
     return;
   }
   const items = {lamp: "This is a lamp", chair: "This is a chair"};
-  const message = items[name.toLowerCase()] || `Item '${name}' not found`;
+  const message = items[name.toLowerCase()] || "Item '" + name + "' not found";
   res.json({item: name, description: message});
+});
+exports.midnightReset = functions.scheduler.onSchedule({
+  schedule: "0 0 * * *", // This means midnight in the specified timezone
+  timeZone: "America/Chicago"},
+async (context) => {
+  try {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+    console.log("Running midnight reset for:", yesterdayStr);
+
+    // Optional: Archive yesterday's responses instead of deleting
+    const responsesRef = db.collection("responses");
+    const yesterdayResponses = await responsesRef
+        .where("opinionId", "==", yesterdayStr)
+        .get();
+
+    // Move to archive collection
+    const archiveRef = db.collection("archivedResponses");
+    const batch = db.batch();
+
+    yesterdayResponses.forEach((doc) => {
+      const archiveDoc = archiveRef.doc(doc.id);
+      batch.set(archiveDoc, {
+        ...doc.data(),
+        archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Delete from active responses
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+
+    console.log("Midnight reset completed for:", yesterdayStr);
+  } catch (error) {
+    console.error("Error in midnight reset:", error);
+  }
+},
+);
+exports.sitemap = functions.https.onRequest(async (req, res) => {
+  res.set("Content-Type", "text/xml");
+  res.set("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
+
+  try {
+    let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
+
+    // Static pages
+    const staticPages = [
+      {url: "/", priority: "1.0", changefreq: "daily"},
+      {url: "/about", priority: "0.8", changefreq: "monthly"},
+      // Add your other static pages
+    ];
+
+    staticPages.forEach((page) => {
+      sitemap += `
+  <url>
+    <loc>https://democracydaily.com${page.url}</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>${page.changefreq}</changefreq>
+    <priority>${page.priority}</priority>
+  </url>`;
+    });
+
+    // Dynamic content from Firestore (articles, etc.)
+    const articlesSnapshot =
+    await admin.firestore().collection("articles").get();
+
+    articlesSnapshot.forEach((doc) => {
+      const article = doc.data();
+      const slug = doc.id; // or however you structure your URLs
+
+      sitemap += `
+  <url>
+    <loc>https://democracydaily.com/article/${slug}</loc>
+    <lastmod>${article.updatedAt ?
+    article.updatedAt.toDate().toISOString().split("T")[0] :
+     new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`;
+    });
+
+    sitemap += "\n</urlset>";
+    res.send(sitemap);
+  } catch (error) {
+    console.error("Error generating sitemap:", error);
+    res.status(500).send("Error generating sitemap");
+  }
 });
