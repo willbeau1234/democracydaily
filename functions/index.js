@@ -421,7 +421,7 @@ exports.sitemap = functions.https.onRequest(async (req, res) => {
     staticPages.forEach((page) => {
       sitemap += `
   <url>
-    <loc>https://democracydaily.com${page.url}</loc>
+    <loc>https://thedemocracydaily.com${page.url}</loc>
     <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
     <changefreq>${page.changefreq}</changefreq>
     <priority>${page.priority}</priority>
@@ -438,7 +438,7 @@ exports.sitemap = functions.https.onRequest(async (req, res) => {
 
       sitemap += `
   <url>
-    <loc>https://democracydaily.com/article/${slug}</loc>
+    <loc>https://thedemocracydaily.com/article/${slug}</loc>
     <lastmod>${article.updatedAt ?
     article.updatedAt.toDate().toISOString().split("T")[0] :
      new Date().toISOString().split("T")[0]}</lastmod>
