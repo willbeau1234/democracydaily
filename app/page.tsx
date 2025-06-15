@@ -331,11 +331,13 @@ export default function OpinionGame() {
   useEffect(() => {
     async function loadOpinion() {
       try {
-        const todayOpinion = await getTodayOpinion()
+        const todayOpinion = await getTodayOpinion()  // ← This function is the problem
+        console.log("Today's opinion:", todayOpinion)
         if (todayOpinion) {
           setOpinionPiece(todayOpinion.content)
+
         } else {
-          setOpinionPiece("🛠️ **Under Maintenance** We're upgrading our platform to serve you better! While we work on exciting new features, we'd love your input.**Share your feedback or suggest features you'd like to see.**We'll be back soon – thanks for your patience!")
+          setOpinionPiece("🛠️ **Under Maintenance**...")  // ← This is showing because getTodayOpinion() returns null
         }
       } catch (error) {
         console.error("Error loading opinion:", error)
