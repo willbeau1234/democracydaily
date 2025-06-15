@@ -30,15 +30,23 @@ export interface Opinion {
 }
 
 export async function getTodayOpinion(): Promise<Opinion | null> {
-  const today = new Date().toISOString().split("T")[0];
-  const docRef = doc(db, "dailyOpinions", today);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists() && docSnap.data().isActive) {
-    return {
-      id: docSnap.id,
-      ...docSnap.data()
-    } as Opinion;
-  } else {
+  try {
+    const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/getTodayOpinion');
+    const result = await response.json();
+    
+    if (result.success && result.opinion) {
+      return {
+        id: result.opinion.id,
+        content: result.opinion.content,
+        publishDate: result.opinion.publishAt,
+        isActive: result.opinion.isActive,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } as Opinion;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching opinion:', error);
     return null;
   }
 }
