@@ -6,49 +6,93 @@ interface TypewriterTextProps {
   text: string
   onComplete: () => void
   speed?: number
+  shouldSkip?: boolean
+  onSkipped?: () => void
 }
 
-export default function TypewriterText({ text, onComplete, speed = 1 }: TypewriterTextProps) {
+export default function TypewriterText({ 
+  text, 
+  onComplete, 
+  speed = 1, 
+  shouldSkip = false,
+  onSkipped 
+}: TypewriterTextProps) {
   const [displayedText, setDisplayedText] = useState("")
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showCursor, setShowCursor] = useState(true)
+  const [isComplete, setIsComplete] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const cursorIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const speedRef = useRef<number>(speed)
-  const isFirstRenderRef = useRef(true)
+  const previousTextRef = useRef<string>("")
 
   // Safe text handling
   const safeText = text || ""
 
+  // Update speed reference when speed prop changes (without restarting)
+  useEffect(() => {
+    speedRef.current = speed
+  }, [speed])
+
   // Function to calculate typing speed (characters per interval)
   const getTypingSpeed = () => {
-    return Math.max(30, 100 / speedRef.current) // Faster = lower interval time
+    return Math.max(30, 100 / speedRef.current)
   }
+
+  // Handle skip when shouldSkip becomes true
+  useEffect(() => {
+    if (shouldSkip && !isComplete) {
+      console.log("Skipping animation!")
+      
+      // Clear intervals
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      
+      // Set to complete state
+      setDisplayedText(safeText)
+      setCurrentIndex(safeText.length)
+      setIsComplete(true)
+      setShowCursor(false)
+      
+      // Call completion handlers
+      onComplete()
+      if (onSkipped) {
+        onSkipped() // This will reset shouldSkip to false in parent
+      }
+    }
+  }, [shouldSkip, isComplete, safeText, onComplete, onSkipped])
 
   // Blinking cursor effect
   useEffect(() => {
+    if (isComplete) return
+
     cursorIntervalRef.current = setInterval(() => {
       setShowCursor(prev => !prev)
-    }, 530) // Blink every 530ms
+    }, 530)
 
     return () => {
       if (cursorIntervalRef.current) {
         clearInterval(cursorIntervalRef.current)
       }
     }
-  }, [])
+  }, [isComplete])
 
   // Main typewriter effect
   useEffect(() => {
-    if (!safeText) return; // Don't start if no text
-    
-    speedRef.current = speed
-
-    // Reset on first render or text change
-    if (isFirstRenderRef.current || safeText !== displayedText.substring(0, safeText.length)) {
-      isFirstRenderRef.current = false
+    // Reset when text changes
+    if (previousTextRef.current !== safeText) {
       setCurrentIndex(0)
       setDisplayedText("")
+      setIsComplete(false)
+      setShowCursor(true)
+      previousTextRef.current = safeText
+    }
+
+    // Don't start if no text or already complete
+    if (!safeText || isComplete) {
+      return
     }
 
     // Clear existing interval
@@ -56,7 +100,7 @@ export default function TypewriterText({ text, onComplete, speed = 1 }: Typewrit
       clearInterval(intervalRef.current)
     }
 
-    // Start typewriter animation
+    // Start animation
     intervalRef.current = setInterval(() => {
       setCurrentIndex((prevIndex) => {
         const nextIndex = prevIndex + 1
@@ -65,6 +109,8 @@ export default function TypewriterText({ text, onComplete, speed = 1 }: Typewrit
           if (intervalRef.current) {
             clearInterval(intervalRef.current)
           }
+          setIsComplete(true)
+          setShowCursor(false)
           onComplete()
           return prevIndex
         }
@@ -79,26 +125,16 @@ export default function TypewriterText({ text, onComplete, speed = 1 }: Typewrit
         clearInterval(intervalRef.current)
       }
     }
-  }, [safeText, speed, onComplete])
-
-  // Reset when text changes
-  useEffect(() => {
-    setCurrentIndex(0)
-    setDisplayedText("")
-    isFirstRenderRef.current = true
-  }, [safeText])
+  }, [safeText, isComplete, onComplete])
 
   return (
     <div className="font-serif text-lg leading-relaxed">
       <span className="inline-block">
         {displayedText}
-        <span 
+        <span
           className={`inline-block w-0.5 h-6 bg-black ml-1 transition-opacity duration-100 ${
             showCursor ? 'opacity-100' : 'opacity-0'
           }`}
-          style={{ 
-            animation: currentIndex >= safeText.length ? 'none' : undefined 
-          }}
         />
       </span>
     </div>

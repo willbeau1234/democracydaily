@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import KaraokeText from "@/components/karaoke-text"
-import { Share2, Copy, Twitter, Facebook } from "lucide-react"
+import { Share2, Copy } from "lucide-react"
+import { FaFacebook } from "react-icons/fa";
+import { FaInstagram } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6"; 
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { db } from '@/lib/firebase';
@@ -14,6 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getTodayOpinion, getOpinionStats, OpinionStats, useRealTimeStats, useRealTimeWordCloud, getUserResponse } from "@/lib/firebase";
 import { collection, addDoc } from 'firebase/firestore';
 import { query, where, getDocs } from 'firebase/firestore';
+
 
 // Dynamic Word Cloud Component
 interface DynamicWordCloudProps {
@@ -274,8 +278,10 @@ export default function OpinionGame() {
   const [isAnimationComplete, setIsAnimationComplete] = useState(false)
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [karaokeSpeed, setKaraokeSpeed] = useState(1)
+  const [shouldSkip, setShouldSkip] = useState(false)
   const [opinionPiece, setOpinionPiece] = useState("")
   const [loadingOpinion, setLoadingOpinion] = useState(true)
+  const [isFeedbackSent, setIsFeedbackSent] = useState(false);
   const [userOriginalResponse, setUserOriginalResponse] = useState<{
     stance: 'agree' | 'disagree';
     reasoning: string;
@@ -286,6 +292,7 @@ export default function OpinionGame() {
   // Use real-time stats
   const today = new Date().toISOString().split("T")[0];
   const { stats: realtimeStats } = useRealTimeStats(today);
+
 
   function getOrCreateUserId() {
     let id = localStorage.getItem("anonUserId");
@@ -328,7 +335,7 @@ export default function OpinionGame() {
         if (todayOpinion) {
           setOpinionPiece(todayOpinion.content)
         } else {
-          setOpinionPiece("No opinion available for today. Check back tomorrow!")
+          setOpinionPiece("🛠️ **Under Maintenance** We're upgrading our platform to serve you better! While we work on exciting new features, we'd love your input.**Share your feedback or suggest features you'd like to see.**We'll be back soon – thanks for your patience!")
         }
       } catch (error) {
         console.error("Error loading opinion:", error)
@@ -340,6 +347,9 @@ export default function OpinionGame() {
     
     loadOpinion()
   }, [])
+  const handleSkip = () => {
+    setShouldSkip(true);
+  }
 
   // Updated to use new Cloud Function
   const handleSubmit = async () => {
@@ -404,6 +414,41 @@ export default function OpinionGame() {
       console.error("Error loading stats:", error);
     }
   };
+  const handleFeedback = async() => {
+    try {
+      const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+      const content = textarea.value;
+      if (!content) return;
+      
+      const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/handlefeedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content
+        }),
+      });
+      
+      if (response.ok) {
+         textarea.value = '';
+        setIsFeedbackSent(true);
+        toast({
+          title: "Feedback sent!",
+          description: "Thank you for your feedback.",
+        });
+      } else {
+        throw new Error('Failed to send feedback');
+      }
+    } catch (error) {
+      console.error("Error sending feedback:", error);
+      toast({
+        title: "Failed to send feedback",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
 
   const handleAnimationComplete = () => {
     setIsAnimationComplete(true)
@@ -420,13 +465,13 @@ export default function OpinionGame() {
 
   const copyToClipboard = () => {
     const shareText = `🏛️ THE DEMOCRACY DAILY ⚖️
-  📜 Opinion of the Day: "${opinionPiece}"
+  📜 Opinion of the Day: "${opinionPiece.split(' ').slice(0, 5).join(' ')}..."
   
   🗳️ My response: I ${selectedOption} because ${reasoning}
   
   🗣️ Share your voice: https://thedemocracydaily.com
   
-  #DemocracyDaily #YourVoiceMatters #CivicEngagement 🏛️`
+  #DemocracyDaily #YourVoiceMatters #Democracy 🏛️`
   
     navigator.clipboard.writeText(shareText).then(
       () => {
@@ -480,6 +525,10 @@ export default function OpinionGame() {
     const url = encodeURIComponent(window.location.href)
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank")
   }
+  const shareToInstagram = () => {
+    const url = encodeURIComponent(window.location.href)
+    window.open(`https://www.instagram.com/sharer/sharer.php?u=${url}`, "_blank")
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">
@@ -507,6 +556,8 @@ export default function OpinionGame() {
                     text={opinionPiece}
                     onComplete={handleAnimationComplete}
                     speed={karaokeSpeed}
+                    shouldSkip={shouldSkip}
+                    onSkipped={() => setShouldSkip(false)} 
                   />
                 </div>
                 
@@ -523,6 +574,13 @@ export default function OpinionGame() {
                     className="w-32"
                   />
                   <span className="text-sm">{karaokeSpeed.toFixed(1)}x</span>
+                </div>
+                <div className = "flex justify-center items-center gap-2">
+                  <Button onClick={handleSkip}
+                    className="w-32"
+                  >
+                    Skip
+                  </Button>
                 </div>
 
                 {isAnimationComplete && (
@@ -590,12 +648,16 @@ export default function OpinionGame() {
                       Copy to clipboard
                     </Button>
                     <Button variant="outline" size="sm" onClick={shareToTwitter} className="flex items-center gap-1">
-                      <Twitter className="h-4 w-4" />
-                      Share on Twitter
+                      <FaXTwitter className="h-4 w-4" />
+                      Share on X
                     </Button>
                     <Button variant="outline" size="sm" onClick={shareToFacebook} className="flex items-center gap-1">
-                      <Facebook className="h-4 w-4" />
+                      <FaFacebook className="h-4 w-4" />
                       Share on Facebook
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={shareToInstagram} className="flex items-center gap-1">
+                      <FaInstagram className="h-4 w-4" />
+                      Share on Instagram
                     </Button>
                   </div>
                 </div>
@@ -692,14 +754,115 @@ export default function OpinionGame() {
             </CardFooter>
           )}
         </Card>
+        {/* Mission Section - Add it here, BEFORE the footer */}
 
-        <div className="bg-white border-t border-gray-300 mt-6 p-4 text-center text-sm text-gray-600">
-          <p>THE DEMOCRACY DAILY - Where Your Voice Matters</p>
-          <p className="mt-1">All opinions expressed are subject to public discourse and democratic values.</p>
+
+        {/* Enhanced Footer */}
+<div className="bg-white border-t-2 border-gray-300 mt-6">
+  {/* Main Footer Content */}
+  <div className="grid md:grid-cols-3 gap-6 p-6 text-sm">
+    
+    {/* See More About the Site */}
+    <div className="text-center md:text-left">
+      <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
+        About The Democracy Daily
+      </h3>
+      <div className="space-y-2 text-gray-700">
+        <p className="font-serif">A platform dedicated to fostering civic engagement through daily opinion discussions.</p>
+        <div className="space-y-1">
+          <a href="mission.html" className="block hover:text-black transition-colors font-serif">
+            📜 Our Mission
+          </a>
+          <a href="works.html" className="block hover:text-black transition-colors font-serif">
+            ⚙️ How It Works
+          </a>
+          <a href="community.html" className="block hover:text-black transition-colors font-serif">
+            🤝 Community Guidelines
+          </a>
+          <a href="priv.html" className="block hover:text-black transition-colors font-serif">
+            🔒 Privacy Policy
+          </a>
         </div>
       </div>
+    </div>
 
+    {/* Contact Section */}
+    <div className="text-center md:text-left">
+      <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
+        Contact
+      </h3>
+      <div className="space-y-2 text-gray-700">
+        <div className="font-serif">
+          <p className="font-semibold mb-2">Get in touch:</p>
+          <div className="space-y-1">
+            <p>📧 democracydaily.editor@gmail.com</p>
+            <p>📱 Follow us on social media</p>
+          </div>
+        </div>
+        <div className="flex justify-center md:justify-start gap-3 mt-3">
+         { /*<Button variant="outline" size="sm" className="font-serif text-xs">
+            <FaFacebook className="h-3 w-3 mr-1" />
+            Facebook
+          </Button>*/}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="font-serif text-xs"
+            onClick={() => window.open('https://www.instagram.com/the_democracydaily/', '_blank')}
+            >
+            <FaInstagram className="h-3 w-3 mr-1" />
+            Instagram
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    {/* Feedback Section */}
+    <div className="text-center md:text-left">
+      <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
+        Your Feedback
+      </h3>
+      <div className="space-y-3">
+        <p className="font-serif text-gray-700 text-xs">
+          Help us improve! Share your thoughts on the platform.
+        </p>
+        <Textarea 
+          placeholder="What would you like to see improved or added?"
+          className="font-serif text-xs h-20 resize-none"
+        />
+        <Button 
+          size="sm" 
+          className="w-full bg-gray-900 hover:bg-black font-serif text-xs"
+          onClick={handleFeedback}
+        >
+          Send Feedback
+        </Button>
+        <div className="text-xs text-gray-500 font-serif">
+          <p>💡 Suggest new topics</p>
+          <p>🐛 Report issues</p>
+          <p>✨ Request features</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* Bottom Footer Bar */}
+  <div className="border-t border-gray-300 bg-gray-50 p-4 text-center text-xs text-gray-600">
+    <div className="flex flex-col md:flex-row justify-between items-center gap-2">
+      <div className="font-serif">
+        <strong>THE DEMOCRACY DAILY</strong> - Where Your Voice Matters
+      </div>
+      <div className="font-serif">
+        All opinions expressed are subject to public discourse and democratic values.
+      </div>
+      <div className="font-serif text-gray-500">
+        © 2025 The Democracy Daily
+      </div>
+      </div>
+      </div>
+      </div>
       <Toaster />
     </div>
+  </div>
   )
 }

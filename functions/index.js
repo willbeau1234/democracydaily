@@ -1,5 +1,7 @@
 const functions = require("firebase-functions/v2");
 const admin = require("firebase-admin");
+const fs = require("fs");
+const path = require("path");
 
 // VERSION: 2024-12-07-DUPLICATE-FIX
 admin.initializeApp();
@@ -219,27 +221,57 @@ exports.getTodayOpinion = functions.https.onRequest({
       return;
     }
 
-    const today = "2025-05-28";
-    const opinionRef = db.collection("dailyOpinions").doc(today);
-    const opinionDoc = await opinionRef.get();
+    // Get today's active opinion
+    const opinionsRef = db.collection("dailyOpinions");
+    const activeOpinionQuery = opinionsRef
+        .where("isActive", "==", true)
+        .limit(1);
+    const activeOpinionSnapshot = await activeOpinionQuery.get();
 
-    if (!opinionDoc.exists) {
-      res.status(404).json({error: "No opinion found for today"});
+    if (!activeOpinionSnapshot.empty) {
+      const opinionDoc = activeOpinionSnapshot.docs[0];
+      const opinionData = opinionDoc.data();
+
+      res.json({
+        success: true,
+        opinion: {
+          id: opinionDoc.id,
+          ...opinionData,
+        },
+      });
       return;
     }
 
-    const opinionData = opinionDoc.data();
+    // If no active opinion, try to activate one
+    const activationResult = await activateNextOpinion();
 
-    if (!opinionData.isActive) {
-      res.status(404).json({error: "Today's opinion is not active"});
-      return;
+    if (activationResult.success) {
+      // Retry getting the active opinion
+      const retrySnapshot = await activeOpinionQuery.get();
+      if (!retrySnapshot.empty) {
+        const opinionDoc = retrySnapshot.docs[0];
+        const opinionData = opinionDoc.data();
+        res.json({
+          success: true,
+          opinion: {
+            id: opinionDoc.id,
+            ...opinionData,
+          },
+        });
+        return;
+      }
     }
-
+    const maintenanceMessage = "🛠️ Under Maintenance We're upgrading" +
+      "While we work on exciting new features, we'd love your input. " +
+      "**Share your feedback or suggest features you'd like to see.** " +
+      "We'll be back soon – thanks for your patience!";
+    // Fallback message
     res.json({
       success: true,
       opinion: {
-        id: opinionDoc.id,
-        ...opinionData,
+        id: "maintenance",
+        content: maintenanceMessage,
+        isActive: true,
       },
     });
   } catch (error) {
@@ -247,7 +279,6 @@ exports.getTodayOpinion = functions.https.onRequest({
     res.status(500).json({success: false, error: error.message});
   }
 });
-
 /**
  * Process text into word frequencies for word cloud
  * @param {string} text - Combined text from all responses
@@ -350,59 +381,59 @@ async function updateOpinionStats(opinionId) {
   }
 }
 
-/**
- * Test function for basic functionality
- */
-exports.hellword = functions.https.onRequest(async (req, res) => {
-  const name = req.query.name;
-  if (!name) {
-    res.status(400).send("Missing 'name' parameter");
-    return;
-  }
-  const items = {lamp: "This is a lamp", chair: "This is a chair"};
-  const message = items[name.toLowerCase()] || "Item '" + name + "' not found";
-  res.json({item: name, description: message});
-});
 exports.midnightReset = functions.scheduler.onSchedule({
-  schedule: "0 0 * * *", // This means midnight in the specified timezone
-  timeZone: "America/Chicago"},
-async (context) => {
+  schedule: "0 0 * * *",
+  timeZone: "America/Chicago",
+}, async (context) => {
   try {
+    const today = new Date().toISOString().split("T")[0];
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split("T")[0];
 
-    console.log("Running midnight reset for:", yesterdayStr);
+    console.log(`Running midnight reset: ${yesterdayStr} → ${today}`);
 
-    // Optional: Archive yesterday's responses instead of deleting
+    // Deactivate yesterday's opinion
+    const opinionsRef = db.collection("dailyOpinions");
+    const yesterdayOpinionsQuery = opinionsRef.where("isActive", "==", true);
+    const yesterdaySnapshot = await yesterdayOpinionsQuery.get();
+
+    const batch = db.batch();
+    yesterdaySnapshot.forEach((doc) => {
+      batch.update(doc.ref, {
+        isActive: false,
+        deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Archive yesterday's responses
     const responsesRef = db.collection("responses");
     const yesterdayResponses = await responsesRef
         .where("opinionId", "==", yesterdayStr)
         .get();
 
-    // Move to archive collection
     const archiveRef = db.collection("archivedResponses");
-    const batch = db.batch();
-
     yesterdayResponses.forEach((doc) => {
       const archiveDoc = archiveRef.doc(doc.id);
       batch.set(archiveDoc, {
         ...doc.data(),
         archivedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-
-      // Delete from active responses
       batch.delete(doc.ref);
     });
-
     await batch.commit();
+    console.log(`Deactivated yesterday's opinions and archived responses`);
 
-    console.log("Midnight reset completed for:", yesterdayStr);
+    // Activate today's opinion
+    const activationResult = await activateNextOpinion();
+    console.log("Opinion activation result:", activationResult);
+
+    return activationResult;
   } catch (error) {
     console.error("Error in midnight reset:", error);
+    return {success: false, error: error.message};
   }
-},
-);
+}); // ← This closes the midnightReset function
 exports.sitemap = functions.https.onRequest(async (req, res) => {
   res.set("Content-Type", "text/xml");
   res.set("Cache-Control", "public, max-age=3600"); // Cache for 1 hour
@@ -452,5 +483,204 @@ exports.sitemap = functions.https.onRequest(async (req, res) => {
   } catch (error) {
     console.error("Error generating sitemap:", error);
     res.status(500).send("Error generating sitemap");
+  }
+});
+exports.handlefeedback = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+  const {content} = req.body;
+
+
+  if (!content) {
+    res.status(400).send("Missing 'message' parameter");
+    return;
+  }
+  try {
+    await admin.firestore().collection("feedback").add({
+      content: content,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Error saving feedback:", error);
+  }
+
+  res.json({success: true});
+
+  console.log("Received feedback:", content);
+  res.json({success: true});
+});
+/**
+ * Activate the next opinion based on publishAt date
+ * @return {Object} Result object with success status and message
+ */
+async function activateNextOpinion() {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    console.log(`Looking for opinion to activate for: ${today}`);
+
+    // Look for an opinion scheduled for today that isn't active yet
+    const opinionsRef = db.collection("dailyOpinions");
+    const todayOpinionQuery = opinionsRef
+        .where("publishAt", "==", today)
+        .where("isActive", "==", false)
+        .limit(1);
+
+    const todayOpinionSnapshot = await todayOpinionQuery.get();
+
+    if (!todayOpinionSnapshot.empty) {
+      // Found an opinion scheduled for today
+      const opinionDoc = todayOpinionSnapshot.docs[0];
+      await opinionDoc.ref.update({
+        isActive: true,
+        activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`Activated scheduled opinion for ${today}`);
+      return {
+        success: true,
+        message: `Activated scheduled opinion for ${today}`,
+        opinionId: opinionDoc.id,
+      };
+    }
+
+    // If no opinion scheduled for today, look for the next available opinion
+    const nextOpinionQuery = opinionsRef
+        .where("isActive", "==", false)
+        .orderBy("publishAt", "asc")
+        .limit(1);
+
+    const nextOpinionSnapshot = await nextOpinionQuery.get();
+
+    if (nextOpinionSnapshot.empty) {
+      console.log("No opinions available");
+      return {success: false, message: "No opinions available to activate"};
+    }
+
+    const nextOpinionDoc = nextOpinionSnapshot.docs[0];
+    await nextOpinionDoc.ref.update({
+      isActive: true,
+      publishAt: today, // Update the publish date to today
+      activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      originalPublishAt: nextOpinionDoc.data().publishAt,
+    });
+
+    console.log(`Activated next available opinion for ${today}`);
+    return {
+      success: true,
+      message: `Activated next available opinion for ${today}`,
+      opinionId: nextOpinionDoc.id,
+    };
+  } catch (error) {
+    console.error("Error activating next opinion:", error);
+    return {success: false, error: error.message};
+  }
+}
+exports.triggerNextOpinion = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    const result = await activateNextOpinion();
+    res.json(result);
+  } catch (error) {
+    console.error("Error triggering next opinion:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+/**
+ * Load opinions from local JSON file and upload to Firestore
+ */
+exports.loadOpinionsFromFile = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    const {adminKey} = req.method === "GET" ? req.query : req.body;
+
+    if (adminKey !== "democracy-admin-2025") {
+      res.status(401).json({error: "Unauthorized"});
+      return;
+    }
+
+    // Read the local JSON file
+    const filePath = path.join(__dirname, "opinions.json");
+    const fileContent = fs.readFileSync(filePath, "utf8");
+    const jsonData = JSON.parse(fileContent);
+
+    if (!jsonData.opinions || !Array.isArray(jsonData.opinions)) {
+      res.status(400).json({error: "Invalid JSON format"});
+      return;
+    }
+
+    console.log(`Processing ${jsonData.opinions.length} opinions from file`);
+
+    // Process opinions and add to Firestore
+    const batch = db.batch();
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    for (const opinion of jsonData.opinions) {
+      if (!opinion.content || !opinion.publishAt) {
+        console.log("Skipping invalid opinion:", opinion);
+        skippedCount++;
+        continue;
+      }
+
+      // Check if opinion already exists for this date
+      const existingQuery = await db
+          .collection("dailyOpinions")
+          .where("publishAt", "==", opinion.publishAt)
+          .get();
+
+      if (!existingQuery.empty) {
+        skippedCount++;
+        continue;
+      }
+
+      // Create new opinion document - matches your exact structure
+      const opinionRef = db.collection("dailyOpinions").doc();
+      batch.set(opinionRef, {
+        content: opinion.content,
+        publishAt: opinion.publishAt,
+        isActive: false, // Always start inactive
+      });
+      addedCount++;
+    }
+
+    // Commit the batch
+    await batch.commit();
+
+    res.json({
+      success: true,
+      message: `Successfully processed opinions from local file`,
+      addedCount,
+      skippedCount,
+      totalProcessed: jsonData.opinions.length,
+    });
+  } catch (error) {
+    console.error("Error processing local file:", error);
+    res.status(500).json({success: false, error: error.message});
   }
 });
