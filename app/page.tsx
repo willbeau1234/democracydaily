@@ -524,13 +524,24 @@ export default function OpinionGame() {
     window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank")
   }
 
-  const shareToFacebook = () => {
-    const url = encodeURIComponent(window.location.href)
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank")
-  }
-  const shareToInstagram = () => {
-    const url = encodeURIComponent(window.location.href)
-    window.open(`https://www.instagram.com/sharer/sharer.php?u=${url}`, "_blank")
+  const shareToSocialMedia = (platform) => {
+    const shareText = `🏛️ THE DEMOCRACY DAILY ⚖️
+  I ${selectedOption} that "${opinionPiece.substring(0, 50)}..."
+  ${window.location.href}
+  #DemocracyDaily`
+  
+    navigator.clipboard.writeText(shareText)
+    
+    if (platform === 'instagram') {
+      window.open('https://www.instagram.com/', '_blank')
+    } else if (platform === 'facebook') {
+      window.open('https://www.facebook.com/', '_blank')
+    }
+    
+    toast({
+      title: `Opening ${platform}! 📱`,
+      description: "Text copied to clipboard - paste it in your post!",
+    })
   }
 
   return (
