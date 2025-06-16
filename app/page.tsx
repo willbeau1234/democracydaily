@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getTodayOpinion, getOpinionStats, OpinionStats, useRealTimeStats, useRealTimeWordCloud, getUserResponse } from "@/lib/firebase";
 import { collection, addDoc } from 'firebase/firestore';
 import { query, where, getDocs } from 'firebase/firestore';
+import TypewriterAnimation from '@/components/TypewriterAnimation';
 
 
 // Dynamic Word Cloud Component
@@ -756,8 +757,15 @@ export default function OpinionGame() {
             </CardFooter>
           )}
         </Card>
-        {/* Mission Section - Add it here, BEFORE the footer */}
+        {/* Typewriter Animation */}
+        <div className="bg-white border rounded-lg shadow-lg mt-6 p-6">
+          <div className="text-center">
+            <h3 className="font-serif text-xl font-bold mb-4">New feature coming soon!</h3>
+            <TypewriterAnimation />
+          </div>
+        </div>
 
+        {/* Enhanced Footer */}
 
         {/* Enhanced Footer */}
 <div className="bg-white border-t-2 border-gray-300 mt-6">
