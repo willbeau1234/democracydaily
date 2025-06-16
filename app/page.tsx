@@ -519,28 +519,48 @@ export default function OpinionGame() {
 
   const shareToTwitter = () => {
     const text = encodeURIComponent(
-      `THE DEMOCRACY DAILY\nI ${selectedOption} that "${opinionPiece}" because ${reasoning.substring(0, 100)}${reasoning.length > 100 ? "..." : ""}`,
+      `THE DEMOCRACY DAILY\nI ${selectedOption} that "${opinionPiece.substring(0, 30)}".... because  ${reasoning.substring(0, 100)} ${reasoning.length > 100 ? "..." : ""} Write your own opinion at https://thedemocracydaily.com`,
     )
     window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank")
   }
-
-  const shareToSocialMedia = (platform) => {
-    const shareText = `🏛️ THE DEMOCRACY DAILY ⚖️
-  I ${selectedOption} that "${opinionPiece.substring(0, 50)}..."
-  ${window.location.href}
-  #DemocracyDaily`
   
-    navigator.clipboard.writeText(shareText)
-    
-    if (platform === 'instagram') {
-      window.open('https://www.instagram.com/', '_blank')
-    } else if (platform === 'facebook') {
+  const shareToFacebook = () => {
+    const shareText = `🏛️ THE DEMOCRACY DAILY ⚖️
+  
+  I ${selectedOption} because ${reasoning}
+  
+  🗣️ Share your voice: ${window.location.href}
+  
+  #DemocracyDaily #YourVoiceMatters #Democracy`
+  
+    navigator.clipboard.writeText(shareText).then(() => {
+      // Open Facebook's create post page
       window.open('https://www.facebook.com/', '_blank')
-    }
-    
-    toast({
-      title: `Opening ${platform}! 📱`,
-      description: "Text copied to clipboard - paste it in your post!",
+      
+      toast({
+        title: "Copied for Facebook! 📋",
+        description: "Facebook opened - paste your opinion in a new post!",
+      })
+    })
+  }
+  
+  const shareToInstagram = () => {
+    // Instagram doesn't have URL-based sharing, so clipboard is actually the RIGHT approach
+    const shareText = `🏛️ THE DEMOCRACY DAILY ⚖️
+  📜 I ${selectedOption} that "${opinionPiece.substring(0, 5)}..."
+  
+  🗣️ Share your voice: ${window.location.href}
+  
+  #DemocracyDaily #YourVoiceMatters #Democracy`
+  
+    navigator.clipboard.writeText(shareText).then(() => {
+      // Also open Instagram so they can paste
+      window.open('https://www.instagram.com/', '_blank')
+      
+      toast({
+        title: "Copied for Instagram! 📋", 
+        description: "Instagram opened - paste this in your story or post!",
+      })
     })
   }
 
