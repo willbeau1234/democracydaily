@@ -472,22 +472,53 @@ export default function OpinionGame() {
 
   // Use realtime stats when available
   const displayStats = realtimeStats || stats;
-  const handleSignIn = async () =>  { 
-    console.log('Sign In clicked');
-    const provider = await new GoogleAuthProvider();
-    return signInWithPopup(auth, provider)
-    // Add your sign in logic here
+  const handleSignIn = async () => {
+    try {
+      
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      
+      console.log('🔵 About to open popup...');
+      const result = await signInWithPopup(auth, provider);
+      
+      
+    } catch (error) {
+      console.error('🔴 Sign in failed:');
+      
+      // Check for common issues
+    }
+    setHasClicked(true);
   };
   
-  const handleLogIn = () => {
-    console.log('Log In clicked');
-    // Add your log in logic here
+  const handleLogIn = async () => {
+    try {
+      console.log('🔵 Starting log in...');
+      
+      const provider = new GoogleAuthProvider();
+      // For login, you might want to skip account selection if they recently signed in
+      provider.setCustomParameters({
+        prompt: 'login' // or 'none' to use last signed-in account
+      });
+      
+      console.log('🔵 About to open popup...');
+      const result = await signInWithPopup(auth, provider);
+      
+      console.log('🟢 Log in successful!', result.user.email);
+      
+    } catch (error) {
+      console.error('🔴 Log in failed:');
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+    }
+    
+    setHasClicked(true);
   };
   
   const handleGuest = () => {
     console.log('Continue as Guest clicked');
     setHasClicked(true);
-    // Add your guest logic here
   };
   
 
