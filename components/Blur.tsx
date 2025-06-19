@@ -5,6 +5,7 @@ interface BlurProps {
   onLogIn: () => void;
   onGuest: () => void;
 }
+
 const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
     const calculateLineCount = (containerHeightPercent: number, density: number = 0.15) => {
         return Math.floor(containerHeightPercent * density);
@@ -24,7 +25,8 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
       margin: '0 auto',
       backgroundColor: 'white',
       boxShadow: '0 0 20px rgba(0,0,0,0.1)',
-      minHeight: '100vh'
+      minHeight: '100vh',
+      position: 'relative'
     },
     header: {
       textAlign: 'center',
@@ -54,7 +56,8 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
       filter: 'blur(3px)',
       opacity: 0.7,
       padding: '30px',
-      position: 'relative'
+      position: 'relative',
+      minHeight: 'calc(100vh - 200px)' // Adjust based on header height
     },
     wavyLine: {
       height: '2px',
@@ -83,51 +86,51 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
     },
     grayBox: {
       position: 'absolute',
-      top: '20%',      // Always 5% from top
-      left: '2%',     // Always 2% from left  
-      width: '50%',   // Always 30% of container
-      height: '400%',   
+      top: '20%',
+      left: '2%',
+      width: '50%',
+      height: '60%',   
       backgroundColor: '#888',
       borderRadius: '15px',
       zIndex: 10
     },
     grayBox2: {
       position: 'absolute',
-      top: '650%',      // Always 5% from top
-      left: '55%',     // Always 2% from left  
-      width: '40%',   // Always 30% of container
-      height: '400%',   // Always 25% of container    
+      top: '94%',
+      left: '55%',
+      width: '40%',
+      height: '40%',
       backgroundColor: '#888',
       borderRadius: '15px',
       zIndex: 10
     },
     linesContainer: {
       position: 'absolute',
-      top: '20%',      // Always 5% from top
-      left: '55%',     // Always 2% from left  
-      width: '40%',   // Always 30% of container
-      height: '400%',   // Always 25% of container    
+      top: '20%',
+      left: '55%',
+      width: '40%',
+      height: '90%',
       zIndex: 10
     },
     linesContainer2: {
       position: 'absolute',
-      top: '450%',      // Always 5% from top
-      left: '2%',     // Always 2% from left  
-      width: '50%',   // Always 30% of container
-      height: '500%',   // Always 25% of container   
+      top: '85%',
+      left: '2%',
+      width: '50%',
+      height: '20%',
       zIndex: 10
     },
     linesContainer3: {
         position: 'absolute',
-        top: '1100%',      // Always 5% from top
-        left: '2%',     // Always 2% from left  
-        width: '90%',   // Always 30% of container
-        height: '500%',   // Always 25% of container   
+        top: '137%',
+        left: '2%',
+        width: '90%',
+        height: '500%',
         zIndex: 10
       },
     centerButtons: {
       position: 'absolute',
-      top: '65%',
+      top: '50%',
       left: '50%',
       transform: 'translate(-50%, -50%)',
       display: 'flex',
@@ -233,11 +236,8 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
         <div style={styles.grayBox}></div>
         <div style={styles.grayBox2}></div>
         
-        {/* Center Buttons */}
-        
-
         <div style={styles.linesContainer}>
-          {[...Array(calculateLineCount(400))].map((_, i) => {
+          {[...Array(calculateLineCount(300))].map((_, i) => {
             const lineTypes = ['wavyLong', 'wavyMedium', 'wavyShort', 'wavyVeryShort'];
             const randomType = lineTypes[i % 4];
             return (
@@ -250,7 +250,7 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
         </div>
 
         <div style={styles.linesContainer2}>
-          {[...Array(calculateLineCount(400))].map((_, i) => {
+          {[...Array(calculateLineCount(215))].map((_, i) => {
             const lineTypes = ['wavyLong', 'wavyMedium', 'wavyShort', 'wavyVeryShort'];
             const randomType = lineTypes[i % 4];
             return (
@@ -273,9 +273,6 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
             );
           })}
         </div>
-        
-
-        
       </div>
     </div>
   );
