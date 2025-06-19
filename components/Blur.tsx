@@ -86,7 +86,7 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
     },
     grayBox: {
       position: 'absolute',
-      top: '20%',
+      top: '5%',
       left: '2%',
       width: '50%',
       height: '60%',   
@@ -96,36 +96,36 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
     },
     grayBox2: {
       position: 'absolute',
-      top: '94%',
+      top: '70%',
       left: '55%',
       width: '40%',
-      height: '40%',
+      height: '60%',
       backgroundColor: '#888',
       borderRadius: '15px',
       zIndex: 10
     },
     linesContainer: {
       position: 'absolute',
-      top: '20%',
+      top: '5%',
       left: '55%',
       width: '40%',
-      height: '90%',
+      height: '70%',
       zIndex: 10
     },
     linesContainer2: {
       position: 'absolute',
-      top: '85%',
+      top: '70%',
       left: '2%',
       width: '50%',
-      height: '20%',
+      height: '80%',
       zIndex: 10
     },
     linesContainer3: {
         position: 'absolute',
-        top: '137%',
+        top: '135%',
         left: '2%',
         width: '90%',
-        height: '500%',
+        height: '20%',
         zIndex: 10
       },
     centerButtons: {
@@ -250,7 +250,7 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
         </div>
 
         <div style={styles.linesContainer2}>
-          {[...Array(calculateLineCount(215))].map((_, i) => {
+          {[...Array(calculateLineCount(290))].map((_, i) => {
             const lineTypes = ['wavyLong', 'wavyMedium', 'wavyShort', 'wavyVeryShort'];
             const randomType = lineTypes[i % 4];
             return (
@@ -262,7 +262,7 @@ const Blur: React.FC<BlurProps> = ({ onSignIn, onLogIn, onGuest }) => {
           })}
         </div>
         <div style={styles.linesContainer3}>
-          {[...Array(calculateLineCount(45))].map((_, i) => {
+          {[...Array(calculateLineCount(40))].map((_, i) => {
             const lineTypes = ['wavyLong', 'wavyMedium', 'wavyShort', 'wavyVeryShort'];
             const randomType = lineTypes[i % 4];
             return (
