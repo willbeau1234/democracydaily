@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, orderBy } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
+import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth"; 
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -28,7 +29,8 @@ export interface Opinion {
   createdAt: Date;
   updatedAt: Date;
 }
-
+export const auth = getAuth(app);
+export default app;
 export async function getTodayOpinion(): Promise<Opinion | null> {
   try {
     const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/getTodayOpinion');

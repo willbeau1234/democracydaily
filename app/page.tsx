@@ -18,13 +18,17 @@ import { getTodayOpinion, getOpinionStats, OpinionStats, useRealTimeStats, useRe
 import { collection, addDoc } from 'firebase/firestore';
 import { query, where, getDocs } from 'firebase/firestore';
 import TypewriterAnimation from '@/components/TypewriterAnimation';
+import Blur from '@/components/Blur';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+
 
 
 // Dynamic Word Cloud Component
 interface DynamicWordCloudProps {
   opinionId: string;
   stance: 'agree' | 'disagree';
-}
+} 
 
 const DynamicWordCloud: React.FC<DynamicWordCloudProps> = ({ opinionId, stance }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -283,7 +287,10 @@ export default function OpinionGame() {
   const [opinionPiece, setOpinionPiece] = useState("")
   const [loadingOpinion, setLoadingOpinion] = useState(true)
   const [isFeedbackSent, setIsFeedbackSent] = useState(false);
+  const [isOpinionDropdownOpen, setIsOpinionDropdownOpen] = useState(false)
+  const [hasClicked, setHasClicked] = useState(false);
   const [userOriginalResponse, setUserOriginalResponse] = useState<{
+
     stance: 'agree' | 'disagree';
     reasoning: string;
   } | null>(null);
@@ -465,6 +472,24 @@ export default function OpinionGame() {
 
   // Use realtime stats when available
   const displayStats = realtimeStats || stats;
+  const handleSignIn = async () =>  { 
+    console.log('Sign In clicked');
+    const provider = await new GoogleAuthProvider();
+    return signInWithPopup(auth, provider)
+    // Add your sign in logic here
+  };
+  
+  const handleLogIn = () => {
+    console.log('Log In clicked');
+    // Add your log in logic here
+  };
+  
+  const handleGuest = () => {
+    console.log('Continue as Guest clicked');
+    setHasClicked(true);
+    // Add your guest logic here
+  };
+  
 
   const copyToClipboard = () => {
     const shareText = `🏛️ THE DEMOCRACY DAILY ⚖️
@@ -571,18 +596,54 @@ export default function OpinionGame() {
         <div className="bg-white border-b-4 border-black mb-6 p-6 text-center">
           <h1 className="text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
           <div className="flex justify-between items-center text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-4 my-2">
-            <span>Vol. 1, No. 1</span>
-            <span>{currentDate}</span>
-            <span>Opinion Section</span>
+  <span>Vol. 1, No. 1</span>
+  <span>{currentDate}</span>
+  
+  {/* Opinion Section Dropdown */}
+  <div className="relative">
+            <button
+              onClick={() => setIsOpinionDropdownOpen(!isOpinionDropdownOpen)}
+              className="flex items-center gap-1 hover:text-black transition-colors font-serif"
+            >
+              Opinion Section
+              <svg 
+                className={`w-3 h-3 transition-transform ${isOpinionDropdownOpen ? 'rotate-180' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {/* Dropdown Menu */}
+            {isOpinionDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white border-2 border-gray-300 rounded-lg shadow-lg z-10">
+                <div className="py-2">
+                  <a href="/DIY.tsx" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
+                    📰 DIY
+                  </a>
+                </div>
+              </div>
+            )}
+            </div>
           </div>
         </div>
+      
+        {!hasClicked && (
+            <Blur onSignIn={handleSignIn} onLogIn={handleLogIn} onGuest={handleGuest} />
+  
+        )}
 
+      {hasClicked && (
+        <>
         {/* Main interactive opinion card */}
         <Card className="w-full shadow-lg border-0">
           <CardHeader className="border-b bg-gray-50">
             <CardTitle className="text-center text-2xl font-serif">Opinion of the Day</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 p-6">
+
             {!hasSubmitted ? (
               <>
                 <div className="min-h-[120px] p-6 bg-white rounded-lg border border-gray-200 font-serif text-lg">
@@ -635,6 +696,7 @@ export default function OpinionGame() {
                         Disagree
                       </Button>
                     </div>
+                
 
                     {selectedOption && (
                       <div className="space-y-2">
@@ -649,8 +711,11 @@ export default function OpinionGame() {
                       </div>
                     )}
                   </>
+
                 )}
               </>
+            
+            
             ) : (
               <div className="space-y-6">
                 <div className="border rounded-lg p-6 bg-white">
@@ -788,6 +853,9 @@ export default function OpinionGame() {
             </CardFooter>
           )}
         </Card>
+        </>
+        )}
+
         {/* Typewriter Animation */}
         <div className="bg-white border rounded-lg shadow-lg mt-6 p-6">
           <div className="text-center">
@@ -795,115 +863,115 @@ export default function OpinionGame() {
             <TypewriterAnimation />
           </div>
         </div>
-
-        {/* Enhanced Footer */}
-
-        {/* Enhanced Footer */}
-<div className="bg-white border-t-2 border-gray-300 mt-6">
-  {/* Main Footer Content */}
-  <div className="grid md:grid-cols-3 gap-6 p-6 text-sm">
-    
-    {/* See More About the Site */}
-    <div className="text-center md:text-left">
-      <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
-        About The Democracy Daily
-      </h3>
-      <div className="space-y-2 text-gray-700">
-        <p className="font-serif">A platform dedicated to fostering civic engagement through daily opinion discussions.</p>
-        <div className="space-y-1">
-          <a href="mission.html" className="block hover:text-black transition-colors font-serif">
-            📜 Our Mission
-          </a>
-          <a href="works.html" className="block hover:text-black transition-colors font-serif">
-            ⚙️ How It Works
-          </a>
-          <a href="community.html" className="block hover:text-black transition-colors font-serif">
-            🤝 Community Guidelines
-          </a>
-          <a href="priv.html" className="block hover:text-black transition-colors font-serif">
-            🔒 Privacy Policy
-          </a>
-        </div>
       </div>
-    </div>
 
-    {/* Contact Section */}
-    <div className="text-center md:text-left">
-      <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
-        Contact
-      </h3>
-      <div className="space-y-2 text-gray-700">
-        <div className="font-serif">
-          <p className="font-semibold mb-2">Get in touch:</p>
+        {/* Enhanced Footer */}
+  <div className="bg-white border-t-2 border-gray-300 mt-6">
+    {/* Main Footer Content */}
+    <div className="grid md:grid-cols-3 gap-6 p-6 text-sm">
+      
+      {/* See More About the Site */}
+      <div className="text-center md:text-left">
+        <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
+          About The Democracy Daily
+        </h3>
+        <div className="space-y-2 text-gray-700">
+          <p className="font-serif">A platform dedicated to fostering civic engagement through daily opinion discussions.</p>
           <div className="space-y-1">
-            <p>📧 democracydaily.editor@gmail.com</p>
-            <p>📱 Follow us on social media</p>
+            <a href="mission.html" className="block hover:text-black transition-colors font-serif">
+              📜 Our Mission
+            </a>
+            <a href="works.html" className="block hover:text-black transition-colors font-serif">
+              ⚙️ How It Works
+            </a>
+            <a href="community.html" className="block hover:text-black transition-colors font-serif">
+              🤝 Community Guidelines
+            </a>
+            <a href="priv.html" className="block hover:text-black transition-colors font-serif">
+              🔒 Privacy Policy
+            </a>
           </div>
         </div>
-        <div className="flex justify-center md:justify-start gap-3 mt-3">
-         { /*<Button variant="outline" size="sm" className="font-serif text-xs">
-            <FaFacebook className="h-3 w-3 mr-1" />
-            Facebook
-          </Button>*/}
+      </div>
+
+      {/* Contact Section */}
+      <div className="text-center md:text-left">
+        <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
+          Contact
+        </h3>
+        <div className="space-y-2 text-gray-700">
+          <div className="font-serif">
+            <p className="font-semibold mb-2">Get in touch:</p>
+            <div className="space-y-1">
+              <p>📧 democracydaily.editor@gmail.com</p>
+              <p>📱 Follow us on social media</p>
+            </div>
+          </div>
+          <div className="flex justify-center md:justify-start gap-3 mt-3">
+          { /*<Button variant="outline" size="sm" className="font-serif text-xs">
+              <FaFacebook className="h-3 w-3 mr-1" />
+              Facebook
+            </Button>*/}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="font-serif text-xs"
+              onClick={() => window.open('https://www.instagram.com/the_democracydaily/', '_blank')}
+              >
+              <FaInstagram className="h-3 w-3 mr-1" />
+              Instagram
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Feedback Section */}
+      <div className="text-center md:text-left">
+        <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
+          Your Feedback
+        </h3>
+        <div className="space-y-3">
+          <p className="font-serif text-gray-700 text-xs">
+            Help us improve! Share your thoughts on the platform.
+          </p>
+          <Textarea 
+            placeholder="What would you like to see improved or added?"
+            className="font-serif text-xs h-20 resize-none"
+          />
           <Button 
-            variant="outline" 
             size="sm" 
-            className="font-serif text-xs"
-            onClick={() => window.open('https://www.instagram.com/the_democracydaily/', '_blank')}
-            >
-            <FaInstagram className="h-3 w-3 mr-1" />
-            Instagram
+            className="w-full bg-gray-900 hover:bg-black font-serif text-xs"
+            onClick={handleFeedback}
+          >
+            Send Feedback
           </Button>
+          <div className="text-xs text-gray-500 font-serif">
+            <p>💡 Suggest new topics</p>
+            <p>🐛 Report issues</p>
+            <p>✨ Request features</p>
+          </div>
         </div>
       </div>
     </div>
 
-    {/* Feedback Section */}
-    <div className="text-center md:text-left">
-      <h3 className="font-serif font-bold text-lg mb-3 border-b border-gray-300 pb-2">
-        Your Feedback
-      </h3>
-      <div className="space-y-3">
-        <p className="font-serif text-gray-700 text-xs">
-          Help us improve! Share your thoughts on the platform.
-        </p>
-        <Textarea 
-          placeholder="What would you like to see improved or added?"
-          className="font-serif text-xs h-20 resize-none"
-        />
-        <Button 
-          size="sm" 
-          className="w-full bg-gray-900 hover:bg-black font-serif text-xs"
-          onClick={handleFeedback}
-        >
-          Send Feedback
-        </Button>
-        <div className="text-xs text-gray-500 font-serif">
-          <p>💡 Suggest new topics</p>
-          <p>🐛 Report issues</p>
-          <p>✨ Request features</p>
+    {/* Bottom Footer Bar */}
+    <div className="border-t border-gray-300 bg-gray-50 p-4 text-center text-xs text-gray-600">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-2">
+        <div className="font-serif">
+          <strong>THE DEMOCRACY DAILY</strong> - Where Your Voice Matters
         </div>
-      </div>
-    </div>
-  </div>
+        <div className="font-serif">
+          All opinions expressed are subject to public discourse and democratic values.
+        </div>
+        <div className="font-serif text-gray-500">
+          © 2025 The Democracy Daily
+        </div>
+      </div>  {/* ✅ Close flex container */}
+    </div>    {/* ✅ Close bottom footer bar */}
+  </div>      {/* ✅ Close main footer container */}
+  
 
-  {/* Bottom Footer Bar */}
-  <div className="border-t border-gray-300 bg-gray-50 p-4 text-center text-xs text-gray-600">
-    <div className="flex flex-col md:flex-row justify-between items-center gap-2">
-      <div className="font-serif">
-        <strong>THE DEMOCRACY DAILY</strong> - Where Your Voice Matters
-      </div>
-      <div className="font-serif">
-        All opinions expressed are subject to public discourse and democratic values.
-      </div>
-      <div className="font-serif text-gray-500">
-        © 2025 The Democracy Daily
-      </div>
-      </div>
-      </div>
-      </div>
-      <Toaster />
-    </div>
-  </div>
-  )
-}
+  <Toaster />
+</div>        
+)             
+}            
