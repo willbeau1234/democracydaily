@@ -5,21 +5,17 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { AuthUser, UserProfile, OpinionResponse } from '@/lib/types';
 
 // GitHub-style Calendar Component
-interface OpinionResponse {
-  opinionId: string;
-  reasoning: string;
-  stance: string;
-  createdAt: any;
-}
-
-const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
+function OpinionCalendar({ userId }: { userId: string }) {
   const [responses, setResponses] = useState<OpinionResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchUserResponses();
+    if (userId) {
+      fetchUserResponses();
+    }
   }, [userId]);
 
   const fetchUserResponses = async () => {
@@ -32,10 +28,13 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
       
       const userResponses: OpinionResponse[] = [];
       querySnapshot.forEach((doc) => {
-        userResponses.push(doc.data() as OpinionResponse);
+        const data = doc.data() as OpinionResponse;
+        userResponses.push({ ...data, id: doc.id });
       });
       
       console.log('✅ Found responses:', userResponses.length);
+      console.log('📋 Sample response data:', userResponses[0]);
+      
       setResponses(userResponses);
     } catch (error) {
       console.error('❌ Error fetching responses:', error);
@@ -46,24 +45,66 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
 
   // Get intensity based on response length
   const getIntensity = (reasoning: string): number => {
+    if (!reasoning) return 0;
     const length = reasoning.length;
     if (length === 0) return 0;
-    if (length < 50) return 1;   // Light green
-    if (length < 150) return 2;  // Medium green
-    if (length < 300) return 3;  // Dark green
-    return 4;                    // Very dark green
+    if (length < 50) return 1;
+    if (length < 150) return 2;
+    if (length < 300) return 3;
+    return 4;
   };
 
   // Get CSS class for intensity
   const getIntensityClass = (intensity: number): string => {
     const classes = [
-      'bg-gray-100',           // 0 - No response
-      'bg-green-200',          // 1 - Light green
-      'bg-green-300',          // 2 - Medium green  
-      'bg-green-500',          // 3 - Dark green
-      'bg-green-700'           // 4 - Very dark green
+      'bg-gray-100',
+      'bg-green-200',
+      'bg-green-300',
+      'bg-green-500',
+      'bg-green-700'
     ];
     return classes[intensity] || classes[0];
+  };
+
+  // Helper function to convert Firebase timestamp to date string
+  const getDateFromResponse = (response: OpinionResponse): string | null => {
+    try {
+      let date: Date | null = null;
+      
+      // Based on your types, the date is in the timestamp field
+      if (response.timestamp) {
+        if (response.timestamp.seconds) {
+          // Firestore Timestamp
+          date = new Date(response.timestamp.seconds * 1000);
+        } else if (response.timestamp.toDate) {
+          // Firestore Timestamp object
+          date = response.timestamp.toDate();
+        } else if (typeof response.timestamp === 'string') {
+          // ISO string
+          date = new Date(response.timestamp);
+        } else if (typeof response.timestamp === 'number') {
+          // Unix timestamp
+          date = new Date(response.timestamp);
+        }
+      }
+      
+      // Fallback: check if opinionId is a date string (YYYY-MM-DD format)
+      if (!date && response.opinionId && typeof response.opinionId === 'string') {
+        const dateMatch = response.opinionId.match(/^\d{4}-\d{2}-\d{2}$/);
+        if (dateMatch) {
+          date = new Date(response.opinionId);
+        }
+      }
+      
+      if (date && !isNaN(date.getTime())) {
+        return date.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error parsing date from response:', error, response);
+      return null;
+    }
   };
 
   // Generate calendar data for the last 12 months
@@ -75,15 +116,36 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
     const days = [];
     const current = new Date(oneYearAgo);
     
+    // Create a map of date strings to responses for faster lookup
+    const responsesByDate = new Map<string, OpinionResponse[]>();
+    
+    responses.forEach(response => {
+      const dateStr = getDateFromResponse(response);
+      if (dateStr) {
+        if (!responsesByDate.has(dateStr)) {
+          responsesByDate.set(dateStr, []);
+        }
+        responsesByDate.get(dateStr)!.push(response);
+      }
+    });
+    
+    console.log('📊 Responses by date:', Array.from(responsesByDate.entries()));
+    
     while (current <= today) {
       const dateStr = current.toISOString().split('T')[0];
-      const response = responses.find(r => r.opinionId === dateStr);
+      const dayResponses = responsesByDate.get(dateStr) || [];
+      
+      const response = dayResponses.length > 0 ? dayResponses[0] : null;
+      const totalIntensity = dayResponses.reduce((sum, r) => 
+        sum + getIntensity(r.reasoning || ''), 0
+      );
       
       days.push({
         date: new Date(current),
         dateStr: dateStr,
         response: response,
-        intensity: response ? getIntensity(response.reasoning) : 0
+        allResponses: dayResponses,
+        intensity: dayResponses.length > 0 ? Math.min(4, Math.max(1, Math.ceil(totalIntensity / dayResponses.length))) : 0
       });
       
       current.setDate(current.getDate() + 1);
@@ -94,28 +156,26 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
 
   const calendarData = generateCalendarData();
   
-  // Group days into weeks (starting from Sunday) - proper GitHub style
+  // Group days into weeks (starting from Sunday)
   const groupIntoWeeks = () => {
     const weeks: any[][] = [];
     
-    // Start from the first Sunday of the year or pad with empty days
+    if (calendarData.length === 0) return weeks;
+    
     const firstDay = calendarData[0];
     const startDayOfWeek = firstDay.date.getDay();
     
-    // Add empty days to align with Sunday start
     let currentWeek = new Array(startDayOfWeek).fill(null);
     
     calendarData.forEach((day) => {
       currentWeek.push(day);
       
-      // If we've filled a week (7 days), start a new one
       if (currentWeek.length === 7) {
         weeks.push(currentWeek);
         currentWeek = [];
       }
     });
     
-    // Fill the last week with nulls if needed
     while (currentWeek.length < 7 && currentWeek.length > 0) {
       currentWeek.push(null);
     }
@@ -128,13 +188,13 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
 
   const weeks = groupIntoWeeks();
   
-  // Transpose weeks to show in GitHub style (weeks as columns, days as rows)
+  // Transpose for GitHub-style display
   const transposeForDisplay = () => {
     const result = [];
     for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
       const row = [];
       for (let week = 0; week < weeks.length; week++) {
-        row.push(weeks[week][dayOfWeek]);
+        row.push(weeks[week] ? weeks[week][dayOfWeek] : null);
       }
       result.push(row);
     }
@@ -146,7 +206,7 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
 
   const totalResponses = responses.length;
   const averageLength = responses.length > 0 
-    ? Math.round(responses.reduce((sum, r) => sum + r.reasoning.length, 0) / responses.length)
+    ? Math.round(responses.reduce((sum, r) => sum + (r.reasoning?.length || 0), 0) / responses.length)
     : 0;
 
   if (loading) {
@@ -162,6 +222,14 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
     <div className="border rounded-lg p-6 bg-white">
       <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity (Last 12 Months)</h4>
       
+      {/* Debug Info */}
+      {responses.length > 0 && (
+        <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+          <strong>Debug Info:</strong> Found {responses.length} responses. 
+          First response timestamp: {responses[0]?.timestamp ? JSON.stringify(responses[0].timestamp) : 'none'}
+        </div>
+      )}
+      
       {/* Stats */}
       <div className="mb-4 flex flex-wrap gap-6 text-sm text-gray-600">
         <div>
@@ -172,12 +240,12 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
         </div>
       </div>
       
-      {/* Calendar Grid - GitHub Style */}
+      {/* Calendar Grid */}
       <div className="mb-4 overflow-x-auto">
         <div className="flex gap-1">
           {/* Day labels */}
           <div className="flex flex-col gap-1 text-xs text-gray-500 mr-2">
-            <div className="w-3 h-3"></div> {/* Spacer for alignment */}
+            <div className="w-3 h-3"></div>
             {dayLabels.map((label, index) => (
               <div key={label} className="w-3 h-3 flex items-center text-xs">
                 {index % 2 === 1 ? label.slice(0, 1) : ''}
@@ -195,8 +263,8 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
                     day ? getIntensityClass(day.intensity) : 'bg-gray-50'
                   }`}
                   title={day ? `${day.date.toLocaleDateString()}: ${
-                    day.response 
-                      ? `"${day.response.stance}" - ${day.response.reasoning.length} characters`
+                    day.allResponses && day.allResponses.length > 0
+                      ? `${day.allResponses.length} response(s) - ${day.allResponses.map(r => r.stance || 'Unknown stance').join(', ')}`
                       : 'No response'
                   }` : ''}
                 />
@@ -220,24 +288,9 @@ const OpinionCalendar: React.FC<{ userId: string }> = ({ userId }) => {
       </div>
     </div>
   );
-};
-
-// Define the simplified profile type
-interface UserProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  createdAt?: any;
-  updatedAt?: any;
-  profileComplete?: boolean;
 }
 
-interface AuthUser {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-}
-
+// Main ProfileView Component - THIS IS THE DEFAULT EXPORT
 export default function ProfileView() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -245,14 +298,18 @@ export default function ProfileView() {
 
   const router = useRouter();
 
-  // Check auth and fetch profile
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        setUser(currentUser);
+        const authUser: AuthUser = {
+          uid: currentUser.uid,
+          email: currentUser.email,
+          displayName: currentUser.displayName
+        };
+        
+        setUser(authUser);
         await fetchProfile(currentUser.uid);
       } else {
-        // Not signed in, redirect to main page
         router.push('/');
       }
     });
@@ -260,7 +317,6 @@ export default function ProfileView() {
     return () => unsubscribe();
   }, [router]);
 
-  // Fetch user profile from Firestore
   const fetchProfile = async (userId: string) => {
     try {
       setLoading(true);
@@ -284,7 +340,6 @@ export default function ProfileView() {
     }
   };
 
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -293,7 +348,6 @@ export default function ProfileView() {
     );
   }
 
-  // No user or profile
   if (!user || !profile) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -336,7 +390,7 @@ export default function ProfileView() {
             </div>
           </div>
 
-          {/* Profile Body - Simple View Only */}
+          {/* Profile Body */}
           <div className="p-6">
             <div className="space-y-6">
               <div className="border-b pb-4">
@@ -353,19 +407,17 @@ export default function ProfileView() {
                     <label className="text-sm font-medium text-gray-500">Display Name</label>
                     <p className="text-lg text-gray-900">{profile.displayName}</p>
                   </div>
-
                   <div>
                     <label className="text-sm font-medium text-gray-500">Email</label>
                     <p className="text-lg text-gray-900">{profile.email}</p>
                   </div>
                 </div>
 
-                {/* Dates Info */}
+                {/* Account History */}
                 <div className="space-y-4">
                   <h4 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
                     Account History
                   </h4>
-                  
                   <div>
                     <label className="text-sm font-medium text-gray-500">Profile Created</label>
                     <p className="text-lg text-gray-900">
@@ -375,7 +427,6 @@ export default function ProfileView() {
                       }
                     </p>
                   </div>
-
                   <div>
                     <label className="text-sm font-medium text-gray-500">Last Updated</label>
                     <p className="text-lg text-gray-900">
@@ -385,7 +436,6 @@ export default function ProfileView() {
                       }
                     </p>
                   </div>
-
                   <div>
                     <label className="text-sm font-medium text-gray-500">Profile Status</label>
                     <p className="text-lg text-gray-900">

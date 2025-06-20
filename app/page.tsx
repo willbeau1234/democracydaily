@@ -23,6 +23,7 @@ import { GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged } from 'f
 import { auth } from '@/lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { AuthUser , OpinionResponse } from '@/lib/types';
 
 
 
@@ -479,15 +480,6 @@ export default function OpinionGame() {
   const displayStats = realtimeStats || stats;
   // At the top of your component (with other hooks)
 const router = useRouter();
-interface AuthUser {
-  uid: string;           // Always required
-  email: string | null;  // Might be null
-  displayName: string | null;
-  opinionId: string;     // Always required
-  stance: 'agree' | 'disagree';
-  reasoning: string;
-  timestamp: Date;
-}
 const checkUserProfileOnReturn = async (user: AuthUser) => {
   try {
     console.log("🔍 Checking returning user profile...");
