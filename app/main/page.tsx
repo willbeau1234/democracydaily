@@ -19,8 +19,12 @@ import { collection, addDoc } from 'firebase/firestore';
 import { query, where, getDocs } from 'firebase/firestore';
 import TypewriterAnimation from '@/components/TypewriterAnimation';
 import Blur from '@/components/Blur';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+
 
 
 
@@ -289,6 +293,7 @@ export default function OpinionGame() {
   const [isFeedbackSent, setIsFeedbackSent] = useState(false);
   const [isOpinionDropdownOpen, setIsOpinionDropdownOpen] = useState(false)
   const [hasClicked, setHasClicked] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [userOriginalResponse, setUserOriginalResponse] = useState<{
 
     stance: 'agree' | 'disagree';
@@ -472,49 +477,122 @@ export default function OpinionGame() {
 
   // Use realtime stats when available
   const displayStats = realtimeStats || stats;
-  const handleSignIn = async () => {
-    try {
-      
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      
-      console.log('🔵 About to open popup...');
-      const result = await signInWithPopup(auth, provider);
-      
-      
-    } catch (error) {
-      console.error('🔴 Sign in failed:');
-      
-      // Check for common issues
-    }
-    setHasClicked(true);
-  };
-  
-  const handleLogIn = async () => {
-    try {
-      console.log('🔵 Starting log in...');
-      
-      const provider = new GoogleAuthProvider();
-      // For login, you might want to skip account selection if they recently signed in
-      provider.setCustomParameters({
-        prompt: 'login' // or 'none' to use last signed-in account
-      });
-      
-      console.log('🔵 About to open popup...');
-      const result = await signInWithPopup(auth, provider);
-      
-      console.log('🟢 Log in successful!', result.user.email);
-      
-    } catch (error) {
-      console.error('🔴 Log in failed:');
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-    }
+  // At the top of your component (with other hooks)
+const router = useRouter();
+interface AuthUser {
+  uid: string;           // Always required
+  email: string | null;  // Might be null
+  displayName: string | null;
+}
+const checkUserProfileOnReturn = async (user: AuthUser) => {
+  try {
+    console.log("🔍 Checking returning user profile...");
+    const docRef = doc(db, 'users', user.uid);
+    const docSnap = await getDoc(docRef);
     
-    setHasClicked(true);
-  };
+    if (docSnap.exists()) {
+      console.log("✅ Returning user has profile - showing content");
+      setHasClicked(true); // Show the opinion content
+    } else {
+      console.log("❌ Returning user has no profile - redirecting to create");
+      router.push('/create-profile');
+    }
+  } catch (error) {
+    console.error("Error checking returning user profile:", error);
+    // If error, redirect to profile creation to be safe
+    router.push('/create-profile');
+  }
+};
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    if (currentUser) {
+      console.log('🔄 User detected:', currentUser.email);
+      setUser(currentUser);
+      
+      // Check if they have a profile
+      await checkUserProfileOnReturn(currentUser);
+      
+    } else {
+      // No user signed in
+      console.log('🔄 No user - showing sign-in popup');
+      setHasClicked(false);
+      setUser(null);
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
+
+// Define checkUserProfile as a separate function (outside both handlers)
+const checkUserProfile = async (user: AuthUser) => {
+  try {
+    console.log("🔍 Checking if user has profile...");
+    const docRef = doc(db, 'users', user.uid);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      console.log("✅ Profile found - redirecting to profile");
+      router.push('/profile'); // or '/dashboard'
+    } else {
+      console.log("❌ No profile found - redirecting to create profile");
+      router.push('/create-profile');
+    }
+  } catch (error) {
+    console.error("Error checking user profile:", error);
+    // Default to profile creation if error
+    router.push('/create-profile');
+  }
+};
+
+// Updated handleSignIn (now with profile checking)
+const handleSignIn = async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
+    console.log('🔵 About to open popup...');
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    
+    console.log('🟢 Sign in successful!', user.email);
+    
+    // Check profile after successful sign in
+    await checkUserProfile(user);
+    
+  } catch (error) {
+    console.error('🔴 Sign in failed:', error.code, error.message);
+  }
+  
+  setHasClicked(true);
+};
+
+// Updated handleLogIn (fixed structure)
+const handleLogIn = async () => {
+  try {
+    console.log('🔵 Starting log in...');
+    
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      prompt: 'login'
+    });
+    
+    console.log('🔵 About to open popup...');
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    
+    console.log('🟢 Log in successful!', user.email);
+    
+    // Check profile after successful login
+    await checkUserProfile(user);
+    
+  } catch (error) {
+    console.error('🔴 Log in failed:', error.code, error.message);
+  }
+  
+  setHasClicked(true);
+};
   
   const handleGuest = () => {
     console.log('Continue as Guest clicked');
@@ -653,6 +731,11 @@ export default function OpinionGame() {
                 <div className="py-2">
                   <a href="/DIY.tsx" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
                     📰 DIY
+                  </a>
+                </div>
+                <div className="py-2">
+                  <a href="/pro" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
+                    👤 profile
                   </a>
                 </div>
               </div>
