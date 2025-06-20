@@ -293,7 +293,7 @@ export default function OpinionGame() {
   const [isFeedbackSent, setIsFeedbackSent] = useState(false);
   const [isOpinionDropdownOpen, setIsOpinionDropdownOpen] = useState(false)
   const [hasClicked, setHasClicked] = useState(false);
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] =   useState<AuthUser | null>(null);
   const [userOriginalResponse, setUserOriginalResponse] = useState<{
 
     stance: 'agree' | 'disagree';
@@ -483,6 +483,10 @@ interface AuthUser {
   uid: string;           // Always required
   email: string | null;  // Might be null
   displayName: string | null;
+  opinionId: string;     // Always required
+  stance: 'agree' | 'disagree';
+  reasoning: string;
+  timestamp: Date;
 }
 const checkUserProfileOnReturn = async (user: AuthUser) => {
   try {

@@ -67,7 +67,7 @@ export default function CreateProfile() {
       await setDoc(doc(db, 'users', user.uid), profileData);
       console.log('✅ Profile created successfully!', profileData);
     
-      router.push('/main');
+      router.push('/');
       
     } catch (error) {
       console.error('❌ Error creating profile:', error);
