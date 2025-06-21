@@ -415,7 +415,7 @@ export default function OpinionGame() {
         throw new Error('Unable to generate user ID');
       }
   
-      const finalReasoning = reasoning.trim() || "No specific reason provided";
+      const finalReasoning = reasoning.trim() || " ";
       const today = new Date().toISOString().split("T")[0];
       
       const OpinionResponseData: OpinionResponse = {
