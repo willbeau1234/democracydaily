@@ -19,11 +19,11 @@ import { collection, addDoc } from 'firebase/firestore';
 import { query, where, getDocs } from 'firebase/firestore';
 import TypewriterAnimation from '@/components/TypewriterAnimation';
 import Blur from '@/components/Blur';
-import { GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { AuthUser , OpinionResponse } from '@/lib/types';
+//import { AuthUser , OpinionResponse } from '@/lib/types';
 
 
 
@@ -323,24 +323,30 @@ export default function OpinionGame() {
       const userId = getOrCreateUserId();
       const today = new Date().toISOString().split("T")[0];
       
-      const userResponse = await getUserResponse(userId, today);
+      const responsesRef = collection(db, 'responses');
+    const q = query(
+      responsesRef, 
+      where('userId', '==', userId),
+      where('opinionId', '==', today)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      const userResponse = doc.data() as OpinionResponse;
       
-      if (userResponse) {
-        setUserOriginalResponse({
-          stance: userResponse.stance,
-          reasoning: userResponse.reasoning
-        });
-        setSelectedOption(userResponse.stance);
-        setReasoning(userResponse.reasoning);
-      }
-    } catch (error) {
-      console.error("Error fetching user response:", error);
+      setUserOriginalResponse({
+        stance: userResponse.stance,
+        reasoning: userResponse.reasoning
+      });
+      setSelectedOption(userResponse.stance);
+      setReasoning(userResponse.reasoning);
+      setHasAlreadySubmitted(true);
     }
-  };
-
-  useEffect(() => {
-    fetchUserResponse();
-  }, []);
+  } catch (error) {
+    console.error("Error fetching user response:", error);
+  }
+};
 
   useEffect(() => {
     async function loadOpinion() {
@@ -373,19 +379,21 @@ export default function OpinionGame() {
       try {
         const userId = getOrCreateUserId();
         const today = new Date().toISOString().split("T")[0];
-        
+        const OpinionResponseData: OpinionResponse = {
+          userId: userId,
+          opinionId: today,
+          stance: selectedOption,
+          reasoning: reasoning.trim(),
+          timestamp: new Date(),
+          characterCount: reasoning.trim().length
+        };
         // Use the new Cloud Function
         const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/submitResponse', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            opinionId: today,
-            stance: selectedOption,
-            reasoning: reasoning.trim(),
-            userId: userId
-          }),
+          body: JSON.stringify(OpinionResponseData),
         });
 
         const result = await response.json();
@@ -528,7 +536,7 @@ const checkUserProfile = async (user: AuthUser) => {
     
     if (docSnap.exists()) {
       console.log("✅ Profile found - redirecting to profile");
-      router.push('/profile'); // or '/dashboard'
+      router.push('/pro'); // or '/dashboard'
     } else {
       console.log("❌ No profile found - redirecting to create profile");
       router.push('/create-profile');
@@ -628,20 +636,26 @@ const handleLogIn = async () => {
       const today = new Date().toISOString().split("T")[0];
       
       const responsesRef = collection(db, "responses");
-      const q = query(
-        responsesRef, 
-        where("userId", "==", userId),
-        where("opinionId", "==", today)
-      );
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        setHasAlreadySubmitted(true);
-      }
-    } catch (error) {
-      console.error("Error checking submission status:", error);
+    const q = query(
+      responsesRef, 
+      where("userId", "==", userId),
+      where("opinionId", "==", today)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      setHasAlreadySubmitted(true);
+      // Load the existing response
+      const existingResponse = querySnapshot.docs[0].data() as OpinionResponse;
+      setUserOriginalResponse({
+        stance: existingResponse.stance,
+        reasoning: existingResponse.reasoning
+      });
     }
-  };
+  } catch (error) {
+    console.error("Error checking submission status:", error);
+  }
+};
 
   useEffect(() => {
     checkIfAlreadySubmitted();
