@@ -322,19 +322,6 @@ function OpinionCalendar({ userId , onStreakCalculated}: { userId: string; onStr
 
   
       
-      {/* Debug Info */}
-    
-
-      {responses.length === 0 && !loading && (
-        <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-          <strong>No data found.</strong> This could be because:
-          <ul className="mt-1 ml-4 list-disc">
-            <li>You haven't submitted any opinions yet</li>
-            <li>You're using a different browser/device</li>
-            <li>Local storage was cleared</li>
-          </ul>
-        </div>
-      )}
       
       {/* Stats */}
       <div className="mb-4 flex flex-wrap gap-6 text-sm text-gray-600">
