@@ -23,7 +23,7 @@ import { GoogleAuthProvider, signInWithPopup, User, onAuthStateChanged, signOut 
 import { auth } from '@/lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-//import { AuthUser , OpinionResponse } from '@/lib/types';
+import { AuthUser , OpinionResponse } from '@/lib/types';
 
 
 
@@ -301,7 +301,9 @@ export default function OpinionGame() {
     reasoning: string;
   } | null>(null);
   const [hasAlreadySubmitted, setHasAlreadySubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [stats, setStats] = useState<OpinionStats | null>(null);
+  
 
   // Use real-time stats
   const today = new Date().toISOString().split("T")[0];
@@ -309,44 +311,64 @@ export default function OpinionGame() {
 
 
   function getOrCreateUserId() {
-    let id = localStorage.getItem("anonUserId");
-    if (!id) {
-      id = uuidv4();
-      localStorage.setItem("anonUserId", id);
+    if (typeof window === 'undefined') {
+      return null;
     }
-    return id;
+    try {
+      let id = localStorage.getItem("anonUserId");
+      if (!id) {
+        id = uuidv4();
+        localStorage.setItem("anonUserId", id);
+      }
+      return id;
+    } catch (error) {
+      console.error("Error accessing localStorage:", error);
+      // Fallback to generating a session-only ID
+      return uuidv4();
+    }
   }
 
   // Define the fetchUserResponse function
   const fetchUserResponse = async () => {
     try {
       const userId = getOrCreateUserId();
+      
+      if (!userId) {
+        console.log("No user ID available for fetching response");
+        return;
+      }
+  
       const today = new Date().toISOString().split("T")[0];
       
       const responsesRef = collection(db, 'responses');
-    const q = query(
-      responsesRef, 
-      where('userId', '==', userId),
-      where('opinionId', '==', today)
-    );
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0];
-      const userResponse = doc.data() as OpinionResponse;
+      const q = query(
+        responsesRef, 
+        where('userId', '==', userId),
+        where('opinionId', '==', today)
+      );
+      const querySnapshot = await getDocs(q);
       
-      setUserOriginalResponse({
-        stance: userResponse.stance,
-        reasoning: userResponse.reasoning
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0];
+        const userResponse = doc.data() as OpinionResponse;
+        
+        setUserOriginalResponse({
+          stance: userResponse.stance,
+          reasoning: userResponse.reasoning
+        });
+        setSelectedOption(userResponse.stance);
+        setReasoning(userResponse.reasoning);
+        setHasAlreadySubmitted(true);
+      }
+    } catch (error) {
+      console.error("Error fetching user response:", error);
+      toast({
+        title: "Error loading response",
+        description: "Could not load your previous response.",
+        variant: "destructive",
       });
-      setSelectedOption(userResponse.stance);
-      setReasoning(userResponse.reasoning);
-      setHasAlreadySubmitted(true);
     }
-  } catch (error) {
-    console.error("Error fetching user response:", error);
-  }
-};
+  };
 
   useEffect(() => {
     async function loadOpinion() {
@@ -375,53 +397,78 @@ export default function OpinionGame() {
 
   // Updated to use new Cloud Function
   const handleSubmit = async () => {
-    if (selectedOption && reasoning.trim()) {
-      try {
-        const userId = getOrCreateUserId();
-        const today = new Date().toISOString().split("T")[0];
-        const OpinionResponseData: OpinionResponse = {
-          userId: userId,
-          opinionId: today,
-          stance: selectedOption,
-          reasoning: reasoning.trim(),
-          timestamp: new Date(),
-          characterCount: reasoning.trim().length
-        };
-        // Use the new Cloud Function
-        const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/submitResponse', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(OpinionResponseData),
-        });
-
-        const result = await response.json();
-        
-        if (result.success) {
-          console.log("Response submitted successfully!");
-          setHasSubmitted(true);
-          await loadStats();
-          
-          toast({
-            title: "Opinion submitted!",
-            description: "Thank you for sharing your thoughts.",
-          });
-        } else {
-          throw new Error(result.error || 'Submission failed');
-        }
-
-      } catch (error) {
-        console.error("Error submitting response:", error);
-        toast({
-          title: "Submission failed",
-          description: "Please try again.",
-          variant: "destructive",
-        });
+    if (!selectedOption) {
+      toast({
+        title: "Please select an option",
+        description: "Choose whether you agree or disagree first.",
+        variant: "destructive",
+      });
+      return;
+    }
+  
+    setIsSubmitting(true);
+  
+    try {
+      const userId = getOrCreateUserId();
+      
+      if (!userId) {
+        throw new Error('Unable to generate user ID');
       }
+  
+      const finalReasoning = reasoning.trim() || "No specific reason provided";
+      const today = new Date().toISOString().split("T")[0];
+      
+      const OpinionResponseData: OpinionResponse = {
+        userId: userId,
+        opinionId: today,
+        stance: selectedOption,
+        reasoning: finalReasoning,
+        timestamp: new Date().toISOString(),
+        characterCount: reasoning.trim().length
+      };
+      
+      console.log("Submitting OpinionResponseData:", OpinionResponseData);
+      
+      // Use the new Cloud Function
+      const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/submitResponse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(OpinionResponseData),
+      });
+  
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      const result = await response.json();
+      console.log("Server response:", result);
+      
+      if (result.success) {
+        console.log("Response submitted successfully!");
+        setHasSubmitted(true);
+        await loadStats();
+        
+        toast({
+          title: "Opinion submitted!",
+          description: "Thank you for sharing your thoughts.",
+        });
+      } else {
+        throw new Error(result.error || 'Submission failed');
+      }
+  
+    } catch (error) {
+      console.error("Error submitting response:", error);
+      toast({
+        title: "Submission failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -630,36 +677,47 @@ const handleLogIn = async () => {
       },
     )
   }
+  
   const checkIfAlreadySubmitted = async () => {
     try {
       const userId = getOrCreateUserId();
+      
+      if (!userId) {
+        console.log("No user ID available, skipping submission check");
+        return;
+      }
+  
       const today = new Date().toISOString().split("T")[0];
       
       const responsesRef = collection(db, "responses");
-    const q = query(
-      responsesRef, 
-      where("userId", "==", userId),
-      where("opinionId", "==", today)
-    );
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      setHasAlreadySubmitted(true);
-      // Load the existing response
-      const existingResponse = querySnapshot.docs[0].data() as OpinionResponse;
-      setUserOriginalResponse({
-        stance: existingResponse.stance,
-        reasoning: existingResponse.reasoning
-      });
+      const q = query(
+        responsesRef, 
+        where("userId", "==", userId),
+        where("opinionId", "==", today)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        setHasAlreadySubmitted(true);
+        // Load the existing response
+        const existingResponse = querySnapshot.docs[0].data() as OpinionResponse;
+        setUserOriginalResponse({
+          stance: existingResponse.stance,
+          reasoning: existingResponse.reasoning
+        });
+        setSelectedOption(existingResponse.stance);
+        setReasoning(existingResponse.reasoning);
+      }
+    } catch (error) {
+      console.error("Error checking submission status:", error);
+      // Don't show error to user, just log it
     }
-  } catch (error) {
-    console.error("Error checking submission status:", error);
-  }
-};
-
-  useEffect(() => {
+  };
+useEffect(() => {
+  if (typeof window !== 'undefined') {
     checkIfAlreadySubmitted();
-  }, []);
+  }
+}, []);
 
   const shareToTwitter = () => {
     const text = encodeURIComponent(
@@ -968,7 +1026,7 @@ const handleLogIn = async () => {
               ) : (
                 <Button
                   onClick={handleSubmit}
-                  disabled={!selectedOption || !reasoning.trim() || !isAnimationComplete}
+                  disabled={!selectedOption || !isAnimationComplete}
                   className="bg-gray-900 hover:bg-black"
                 >
                   Submit Your Opinion

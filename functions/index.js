@@ -307,7 +307,8 @@ function processTextToWordFrequencies(text) {
     "like", "think", "also", "would", "could", "go", "see", "know",
     "take", "say", "make", "way", "time", "people", "many", "well",
     "first", "good", "much", "new", "work", "right", "even", "back",
-    "want", "come", "use", "really", "need", "feel", "believe","more"
+    "want", "come", "use", "really", "need", "feel", "believe", "more",
+    "provided", "specific", "reason",
   ]);
 
   const words = text.toLowerCase()
