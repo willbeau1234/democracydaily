@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,16 +11,9 @@ import { Toaster } from "@/components/ui/toaster"
 import { getOpinionByToken, submitVote, subscribeToVotes, generateWordCloudData, getVotesForOpinion } from '@/lib/firebase'
 import WordCloudComponent from '@/components/WordCloud'
 
-// This function is required for static export but won't be used for actual token generation
-export async function generateStaticParams() {
-  // Return an empty array since tokens are generated dynamically
-  // This satisfies the static export requirement
-  return []
-}
-
 export default function OpinionVotingPage() {
-  const params = useParams()
-  const token = params.token as string
+  const searchParams = useSearchParams()
+  const token = searchParams.get('token')
   
   const [opinion, setOpinion] = useState(null)
   const [votes, setVotes] = useState([])
@@ -32,7 +25,14 @@ export default function OpinionVotingPage() {
   const [wordCloudData, setWordCloudData] = useState([])
 
   useEffect(() => {
-    if (!token) return
+    if (!token) {
+      toast({
+        title: "Missing token",
+        description: "No opinion token provided.",
+        variant: "destructive"
+      })
+      return
+    }
 
     let unsubscribe: (() => void) | null = null
     let pollInterval: NodeJS.Timeout | null = null
@@ -358,7 +358,7 @@ export default function OpinionVotingPage() {
             </CardHeader>
             {showWordCloud && (
               <CardContent className="p-6">
-                <WordCloudComponent words={wordCloudData} />
+                <WordCloudComponent data={wordCloudData} />
                 <p className="text-xs text-gray-500 text-center mt-2">
                   Generated from {votes.filter(v => v.comment).length} participant comments
                 </p>
@@ -398,4 +398,4 @@ export default function OpinionVotingPage() {
       <Toaster />
     </div>
   )
-}
+} 

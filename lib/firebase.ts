@@ -417,7 +417,7 @@ export const createUserOpinion = async (
     if (result.success) {
       return {
         id: opinionId,
-        shareableLink: `${window.location.origin}/opinion/${shareableToken}`,
+        shareableLink: `${window.location.origin}/opinion?token=${shareableToken}`,
         shareableToken
       }
     } else {
