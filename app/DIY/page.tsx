@@ -9,18 +9,21 @@ import { Share2, Copy, Eye, ArrowLeft } from "lucide-react"
 import { FaFacebook, FaInstagram, FaXTwitter } from "react-icons/fa6"
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-import { createUserOpinion } from "@/lib/firebase"
+import { createUserOpinion, CreateDIYOpinionResult } from "@/lib/firebase"
 import { v4 as uuidv4 } from "uuid"
 import TypewriterAnimation from '@/components/TypewriterAnimation'
+import { Upload, X, Image } from "lucide-react"
 
 export default function DIYOpinion() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [authorName, setAuthorName] = useState("")
   const [isCreating, setIsCreating] = useState(false)
-  const [createdOpinion, setCreatedOpinion] = useState(null)
+  const [createdOpinion, setCreatedOpinion] = useState<CreateDIYOpinionResult | null>(null)
   const [isOpinionDropdownOpen, setIsOpinionDropdownOpen] = useState(false)
   const [isFeedbackSent, setIsFeedbackSent] = useState(false)
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -47,7 +50,7 @@ export default function DIYOpinion() {
       })
       return
     }
-
+  
     setIsCreating(true)
     try {
       const userId = getOrCreateUserId()
@@ -55,8 +58,8 @@ export default function DIYOpinion() {
         title: title.trim(),
         content: content.trim(),
         authorName: authorName.trim() || "Anonymous"
-      })
-
+      }, selectedPhoto) // Pass the photo file here
+  
       setCreatedOpinion(result)
       
       toast({
@@ -75,6 +78,50 @@ export default function DIYOpinion() {
     }
   }
 
+  const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+  
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file (JPG, PNG, GIF, etc.)",
+        variant: "destructive"
+      })
+      return
+    }
+  
+    // Validate file size (5MB = 5 * 1024 * 1024 bytes)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB.",
+        variant: "destructive"
+      })
+      return
+    }
+  
+    setSelectedPhoto(file)
+    
+    // Create preview
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      if (e.target?.result && typeof e.target.result === 'string') {
+        setPhotoPreview(e.target.result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+  
+  const removePhoto = () => {
+    setSelectedPhoto(null)
+    setPhotoPreview(null)
+    // Reset file input
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    if (fileInput) fileInput.value = ''
+  }
+
   const copyShareLink = () => {
     if (!createdOpinion) return
     
@@ -90,10 +137,14 @@ export default function DIYOpinion() {
     setTitle("")
     setContent("")
     setAuthorName("")
+    setSelectedPhoto(null)
+    setPhotoPreview(null)
     setCreatedOpinion(null)
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    if (fileInput) fileInput.value = ''
   }
-
-  const shareToSocial = (platform) => {
+  
+  const shareToSocial = (platform: 'twitter' | 'facebook' | 'instagram') => {
     if (!createdOpinion) return
 
     const shareText = `🏛️ THE DEMOCRACY DAILY - DIY OPINION 🗣️
@@ -256,6 +307,7 @@ Join my private discussion: ${createdOpinion.shareableLink}
                   className="font-serif"
                 />
               </div>
+              
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-serif font-bold text-sm mb-2">🔒 How it works:</h4>

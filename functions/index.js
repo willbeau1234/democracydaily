@@ -685,3 +685,246 @@ exports.loadOpinionsFromFile = functions.https.onRequest({
     res.status(500).json({success: false, error: error.message});
   }
 });
+/**
+ * Create a new DIY opinion with optional photo
+ */
+exports.createDIYOpinion = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    const {
+      opinionId,
+      userId,
+      title,
+      content,
+      authorName,
+      photoUrl,
+      shareableToken,
+    } = req.body;
+
+    if (!opinionId || !title || !content) {
+      res.status(400).json({error: "Missing required fields"});
+      return;
+    }
+
+    const opinionData = {
+      id: opinionId,
+      userId,
+      title: title.trim(),
+      content: content.trim(),
+      authorName: authorName || "Anonymous",
+      photoUrl: photoUrl || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      isPrivate: true,
+      shareableToken,
+      agreeCount: 0,
+      disagreeCount: 0,
+    };
+
+    await db.collection("diy_opinions").doc(opinionId).set(opinionData);
+
+    res.json({
+      success: true,
+      message: "DIY opinion created successfully",
+      opinionId,
+    });
+  } catch (error) {
+    console.error("Error creating DIY opinion:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Get DIY opinion by shareable token
+ */
+exports.getDIYOpinion = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    const {token} = req.method === "GET" ? req.query : req.body;
+
+    if (!token) {
+      res.status(400).json({error: "Missing token"});
+      return;
+    }
+
+    const opinionsRef = db.collection("diy_opinions");
+    const q = opinionsRef.where("shareableToken", "==", token);
+    const querySnapshot = await q.get();
+
+    if (querySnapshot.empty) {
+      res.status(404).json({success: false, error: "Opinion not found"});
+      return;
+    }
+
+    const opinion = querySnapshot.docs[0].data();
+    res.json({
+      success: true,
+      opinion,
+    });
+  } catch (error) {
+    console.error("Error getting DIY opinion:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Submit vote on DIY opinion
+ */
+exports.submitDIYVote = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    const {opinionId, vote, comment, voterFingerprint} = req.body;
+
+    if (!opinionId || !vote || !voterFingerprint) {
+      res.status(400).json({error: "Missing required fields"});
+      return;
+    }
+
+    if (!["agree", "disagree"].includes(vote)) {
+      res.status(400).json({error: "Vote must be 'agree' or 'disagree'"});
+      return;
+    }
+
+    // Check for existing vote
+    const votesRef = db.collection("diy_votes");
+    const existingVoteQuery = votesRef
+        .where("opinionId", "==", opinionId)
+        .where("voterFingerprint", "==", voterFingerprint);
+
+    const existingSnapshot = await existingVoteQuery.get();
+
+    if (!existingSnapshot.empty) {
+      res.status(400).json({error: "You have already voted on this opinion"});
+      return;
+    }
+
+    // Create new vote
+    const voteData = {
+      opinionId,
+      vote,
+      comment: comment || "",
+      voterFingerprint,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await votesRef.add(voteData);
+
+    res.json({
+      success: true,
+      message: "Vote submitted successfully",
+    });
+  } catch (error) {
+    console.error("Error submitting DIY vote:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Get aggregated DIY votes for word cloud
+ */
+exports.getDIYVotes = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    const {opinionId} = req.method === "GET" ? req.query : req.body;
+
+    if (!opinionId) {
+      res.status(400).json({error: "Missing opinionId"});
+      return;
+    }
+
+    const votesRef = db.collection("diy_votes");
+    const q = votesRef.where("opinionId", "==", opinionId);
+    const querySnapshot = await q.get();
+
+    const votes = [];
+    const comments = [];
+    let agreeCount = 0;
+    let disagreeCount = 0;
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      votes.push({
+        id: doc.id,
+        vote: data.vote,
+        comment: data.comment,
+        createdAt: data.createdAt,
+      });
+
+      if (data.vote === "agree") agreeCount++;
+      else if (data.vote === "disagree") disagreeCount++;
+
+      if (data.comment && data.comment.trim().length > 0) {
+        comments.push(data.comment);
+      }
+    });
+
+    // Generate word cloud data using your existing function
+    const combinedText = comments.join(" ");
+    const wordFrequencies = processTextToWordFrequencies(combinedText);
+
+    res.json({
+      success: true,
+      opinionId,
+      votes,
+      stats: {
+        agreeCount,
+        disagreeCount,
+        totalVotes: agreeCount + disagreeCount,
+      },
+      wordCloudData: wordFrequencies,
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error getting DIY votes:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});

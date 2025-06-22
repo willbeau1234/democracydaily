@@ -797,7 +797,7 @@ useEffect(() => {
             {isOpinionDropdownOpen && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-white border-2 border-gray-300 rounded-lg shadow-lg z-10">
                 <div className="py-2">
-                  <a href="/DIY.tsx" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
+                  <a href="/DIY" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
                     📰 DIY
                   </a>
                 </div>
