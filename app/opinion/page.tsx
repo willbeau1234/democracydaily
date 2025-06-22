@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -11,7 +11,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { getOpinionByToken, submitVote, subscribeToVotes, generateWordCloudData, getVotesForOpinion } from '@/lib/firebase'
 import WordCloudComponent from '@/components/WordCloud'
 
-export default function OpinionVotingPage() {
+function OpinionVotingContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
   
@@ -397,5 +397,20 @@ export default function OpinionVotingPage() {
       </div>
       <Toaster />
     </div>
+  )
+}
+
+export default function OpinionVotingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="font-serif">Loading...</p>
+        </div>
+      </div>
+    }>
+      <OpinionVotingContent />
+    </Suspense>
   )
 } 
