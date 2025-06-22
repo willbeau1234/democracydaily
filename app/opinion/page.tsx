@@ -50,6 +50,34 @@ function OpinionVotingContent() {
         }
         setOpinion(opinionData)
         
+        // Immediately load existing votes
+        try {
+          console.log('Loading votes for opinion:', opinionData.id)
+          const initialVotes = await getVotesForOpinion(opinionData.id)
+          console.log('Initial votes loaded:', initialVotes)
+          console.log('Initial votes length:', initialVotes.length)
+          console.log('Initial votes structure:', initialVotes.map(v => ({ 
+            id: v.id, 
+            vote: v.vote, 
+            opinionId: v.opinionId,
+            voterFingerprint: v.voterFingerprint?.substring(0, 8) + '...'
+          })))
+          setVotes(initialVotes)
+          
+          // Generate word cloud data
+          const cloudData = generateWordCloudData(initialVotes)
+          setWordCloudData(cloudData)
+          
+          // Check if current user has voted
+          const voterFingerprint = localStorage.getItem('voterFingerprint')
+          console.log('Current voter fingerprint:', voterFingerprint?.substring(0, 8) + '...')
+          const existingVote = initialVotes.find(vote => vote.voterFingerprint === voterFingerprint)
+          console.log('Existing vote found:', existingVote)
+          setUserVote(existingVote)
+        } catch (voteError) {
+          console.error('Error loading initial votes:', voteError)
+        }
+        
         // Try to subscribe to real-time votes
         try {
           unsubscribe = subscribeToVotes(opinionData.id, (votesData) => {
@@ -71,6 +99,7 @@ function OpinionVotingContent() {
           pollInterval = setInterval(async () => {
             try {
               const votesData = await getVotesForOpinion(opinionData.id)
+              console.log('Polling votes update:', votesData)
               setVotes(votesData)
               
               // Generate word cloud data
@@ -165,6 +194,33 @@ function OpinionVotingContent() {
   const disagreeCount = votes.filter(vote => vote.vote === 'disagree').length
   const totalVotes = agreeCount + disagreeCount
   const agreePercentage = totalVotes > 0 ? (agreeCount / totalVotes) * 100 : 0
+
+  // Debug logging
+  console.log('Vote calculation:', {
+    totalVotes: votes.length,
+    agreeCount,
+    disagreeCount,
+    totalVotes,
+    agreePercentage,
+    votes: votes.map(v => ({ 
+      vote: v.vote, 
+      comment: v.comment?.substring(0, 20),
+      id: v.id,
+      opinionId: v.opinionId
+    }))
+  })
+  
+  // Additional debugging for vote filtering
+  const agreeVotes = votes.filter(vote => vote.vote === 'agree')
+  const disagreeVotes = votes.filter(vote => vote.vote === 'disagree')
+  console.log('Agree votes:', agreeVotes.length, agreeVotes.map(v => ({ vote: v.vote, id: v.id })))
+  console.log('Disagree votes:', disagreeVotes.length, disagreeVotes.map(v => ({ vote: v.vote, id: v.id })))
+  
+  // Validate vote structure
+  const invalidVotes = votes.filter(vote => !vote.vote || (vote.vote !== 'agree' && vote.vote !== 'disagree'))
+  if (invalidVotes.length > 0) {
+    console.warn('Invalid votes found:', invalidVotes)
+  }
 
   if (loading) {
     return (

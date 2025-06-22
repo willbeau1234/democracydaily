@@ -485,15 +485,25 @@ export const submitVote = async (opinionId: string, voteData: DIYVoteData): Prom
 // Get votes for a DIY opinion
 export const getVotesForOpinion = async (opinionId: string): Promise<DIYVote[]> => {
   try {
-    // Try Cloud Function first
-    const response = await fetch(`https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/getDIYVotes?opinionId=${opinionId}`)
-    const result = await response.json()
+    console.log('Fetching votes for opinion:', opinionId)
     
-    if (result.success) {
-      return result.votes as DIYVote[]
+    // Try Cloud Function first
+    try {
+      const response = await fetch(`https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/getDIYVotes?opinionId=${opinionId}`)
+      const result = await response.json()
+      
+      if (result.success && result.votes) {
+        console.log('Votes from Cloud Function:', result.votes)
+        return result.votes as DIYVote[]
+      } else {
+        console.log('Cloud Function failed or returned no votes:', result)
+      }
+    } catch (cloudError) {
+      console.log('Cloud Function error, falling back to Firestore:', cloudError)
     }
     
     // Fallback to direct Firestore query
+    console.log('Falling back to direct Firestore query')
     const q = query(
       collection(db, 'diy_votes'), 
       where('opinionId', '==', opinionId),
@@ -501,10 +511,19 @@ export const getVotesForOpinion = async (opinionId: string): Promise<DIYVote[]> 
     )
     const querySnapshot = await getDocs(q)
     
-    return querySnapshot.docs.map(doc => doc.data() as DIYVote)
+    const votes = querySnapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        ...data,
+        id: doc.id
+      } as DIYVote
+    })
+    
+    console.log('Votes from Firestore:', votes)
+    return votes
   } catch (error) {
     console.error('Error fetching votes:', error)
-    throw error
+    return []
   }
 }
 
