@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Allow public read access to daily opinions (for the main page)
+    match /opinions/{opinionId} {
+      allow read: if true;
+      allow write: if false; // Only allow writes through Cloud Functions
+    }
+    
+    // Allow public read/write access to responses (for voting on daily opinions)
+    match /responses/{responseId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false; // Prevent modification of existing responses
+    }
+    
+    // DIY Opinions - allow creation and reading by token
+    match /diy_opinions/{opinionId} {
+      allow read: if true; // Anyone can read if they have the token
+      allow create: if true; // Anyone can create DIY opinions
+      allow update, delete: if false; // Prevent modification through client
+    }
+    
+    // DIY Votes - allow creation but prevent duplicate votes
+    match /diy_votes/{voteId} {
+      allow read: if true; // Anyone can read votes
+      allow create: if true; // Anyone can create votes
+      allow update, delete: if false; // Prevent modification of existing votes
+    }
+    
+    // User profiles (if you add them later)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Feedback collection (if you add it)
+    match /feedback/{feedbackId} {
+      allow read: if false; // Only admins should read feedback
+      allow create: if true; // Anyone can submit feedback
+      allow update, delete: if false;
+    }
+    
+    // Deny access to all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 

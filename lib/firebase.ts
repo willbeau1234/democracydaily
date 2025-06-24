@@ -104,6 +104,8 @@ export async function submitResponse(
     
     if (result.success) {
       console.log("Response submitted successfully")
+      // Record user participation for streak tracking
+      await recordUserParticipation()
       return true
     } else {
       console.error("Error submitting response:", result.error)
@@ -357,6 +359,7 @@ export interface DIYVote {
   vote: 'agree' | 'disagree'
   comment: string
   voterFingerprint: string
+  userId: string
   createdAt: Timestamp
 }
 
@@ -447,7 +450,7 @@ export const getOpinionByToken = async (token: string): Promise<DIYOpinion | nul
 // Submit a vote on DIY opinion
 export const submitVote = async (opinionId: string, voteData: DIYVoteData): Promise<DIYVote> => {
   try {
-    const voterFingerprint = getOrCreateVoterFingerprint()
+    const userFingerprint = getUserIdentifier()
     
     const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/submitDIYVote', {
       method: 'POST',
@@ -458,19 +461,25 @@ export const submitVote = async (opinionId: string, voteData: DIYVoteData): Prom
         opinionId,
         vote: voteData.vote,
         comment: voteData.comment || '',
-        voterFingerprint
+        voterFingerprint: userFingerprint,
+        userId: getOrCreateUserId(),
+        timestamp: new Date().toISOString()
       }),
     })
 
     const result = await response.json()
     
     if (result.success) {
+      // Record user participation for streak tracking
+      await recordUserParticipation()
+      
       return {
         id: uuidv4(),
         opinionId,
         vote: voteData.vote,
         comment: voteData.comment || '',
-        voterFingerprint,
+        voterFingerprint: userFingerprint,
+        userId: getOrCreateUserId(),
         createdAt: Timestamp.fromDate(new Date())
       } as DIYVote
     } else {
@@ -554,6 +563,34 @@ const getOrCreateVoterFingerprint = (): string => {
   return fingerprint
 }
 
+// Generate anonymous user ID (consistent across all features)
+const getOrCreateUserId = (): string => {
+  let userId = localStorage.getItem('anonUserId')
+  if (!userId) {
+    userId = uuidv4()
+    localStorage.setItem('anonUserId', userId)
+  }
+  return userId
+}
+
+// Get user identifier for any voting system
+export const getUserIdentifier = (): string => {
+  // Use the same identifier for all voting systems
+  return getOrCreateVoterFingerprint()
+}
+
+// Check if user has voted on a specific opinion
+export const hasUserVoted = (opinionId: string, votes: any[]): boolean => {
+  const userFingerprint = getUserIdentifier()
+  return votes.some(vote => vote.voterFingerprint === userFingerprint)
+}
+
+// Get user's vote on a specific opinion
+export const getUserVote = (opinionId: string, votes: any[]): any | null => {
+  const userFingerprint = getUserIdentifier()
+  return votes.find(vote => vote.voterFingerprint === userFingerprint) || null
+}
+
 // Generate word cloud data from vote comments
 export const generateWordCloudData = (votes: DIYVote[]): WordCloudItem[] => {
   const allText = votes
@@ -580,4 +617,238 @@ export const generateWordCloudData = (votes: DIYVote[]): WordCloudItem[] => {
     .map(([text, size]) => ({ text, size }))
     .sort((a, b) => b.size - a.size)
     .slice(0, 50) // Top 50 words
+}
+
+// Simple authentication system (optional)
+export interface UserProfile {
+  id: string
+  name: string
+  email?: string
+  createdAt: Date
+  lastActive: Date
+}
+
+// Create or get user profile
+export const createOrGetUserProfile = async (name: string, email?: string): Promise<UserProfile> => {
+  const userId = getOrCreateUserId()
+  
+  // Store user profile in localStorage for now
+  // In a real app, you'd store this in Firestore
+  const profile: UserProfile = {
+    id: userId,
+    name,
+    email,
+    createdAt: new Date(),
+    lastActive: new Date()
+  }
+  
+  localStorage.setItem('userProfile', JSON.stringify(profile))
+  return profile
+}
+
+// Get current user profile
+export const getCurrentUserProfile = (): UserProfile | null => {
+  const profile = localStorage.getItem('userProfile')
+  return profile ? JSON.parse(profile) : null
+}
+
+// Update user activity
+export const updateUserActivity = () => {
+  const profile = getCurrentUserProfile()
+  if (profile) {
+    profile.lastActive = new Date()
+    localStorage.setItem('userProfile', JSON.stringify(profile))
+  }
+}
+
+// Streak tracking system
+export interface UserStreak {
+  currentStreak: number
+  longestStreak: number
+  lastParticipationDate: string // ISO date string
+  totalParticipations: number
+  participationDates: string[] // Array of ISO date strings
+}
+
+// Get today's date in ISO format (YYYY-MM-DD)
+const getTodayDate = (): string => {
+  return new Date().toISOString().split('T')[0]
+}
+
+// Get yesterday's date in ISO format
+const getYesterdayDate = (): string => {
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  return yesterday.toISOString().split('T')[0]
+}
+
+// Check if a date is yesterday
+const isYesterday = (dateString: string): boolean => {
+  return dateString === getYesterdayDate()
+}
+
+// Check if a date is today
+const isToday = (dateString: string): boolean => {
+  return dateString === getTodayDate()
+}
+
+// Calculate streak from participation dates
+const calculateStreak = (participationDates: string[]): { currentStreak: number, longestStreak: number } => {
+  if (participationDates.length === 0) {
+    return { currentStreak: 0, longestStreak: 0 }
+  }
+
+  // Sort dates in descending order (most recent first)
+  const sortedDates = [...participationDates].sort((a, b) => b.localeCompare(a))
+  
+  let currentStreak = 0
+  let longestStreak = 0
+  let tempStreak = 0
+  let expectedDate = getTodayDate()
+  
+  // Check if user participated today or yesterday to determine if streak is active
+  const hasRecentParticipation = isToday(sortedDates[0]) || isYesterday(sortedDates[0])
+  
+  if (hasRecentParticipation) {
+    // Calculate current streak
+    for (let i = 0; i < 365; i++) {
+      const dateStr = expectedDate
+      if (sortedDates.includes(dateStr)) {
+        tempStreak++
+        // Move to previous day
+        const prevDate = new Date(expectedDate)
+        prevDate.setDate(prevDate.getDate() - 1)
+        expectedDate = prevDate.toISOString().split('T')[0]
+      } else {
+        break
+      }
+    }
+    currentStreak = tempStreak
+  }
+  
+  // Calculate longest streak from all dates
+  let maxStreak = 0
+  let currentMaxStreak = 0
+  let lastDate: string | null = null
+  
+  for (const date of sortedDates) {
+    if (lastDate === null) {
+      currentMaxStreak = 1
+    } else {
+      const lastDateObj = new Date(lastDate)
+      const currentDateObj = new Date(date)
+      const diffTime = lastDateObj.getTime() - currentDateObj.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      
+      if (diffDays === 1) {
+        currentMaxStreak++
+      } else {
+        maxStreak = Math.max(maxStreak, currentMaxStreak)
+        currentMaxStreak = 1
+      }
+    }
+    lastDate = date
+  }
+  
+  longestStreak = Math.max(maxStreak, currentMaxStreak, currentStreak)
+  
+  return { currentStreak, longestStreak }
+}
+
+// Record user participation (call this when user votes or creates opinion)
+export const recordUserParticipation = async (): Promise<UserStreak> => {
+  const userId = getOrCreateUserId()
+  const today = getTodayDate()
+  
+  // Get current streak data
+  const currentStreak = getUserStreak()
+  
+  // Check if user already participated today
+  if (currentStreak.participationDates.includes(today)) {
+    return currentStreak
+  }
+  
+  // Add today to participation dates
+  const newParticipationDates = [...currentStreak.participationDates, today]
+  
+  // Calculate new streak
+  const { currentStreak: newCurrentStreak, longestStreak: newLongestStreak } = calculateStreak(newParticipationDates)
+  
+  // Create updated streak data
+  const updatedStreak: UserStreak = {
+    currentStreak: newCurrentStreak,
+    longestStreak: newLongestStreak,
+    lastParticipationDate: today,
+    totalParticipations: newParticipationDates.length,
+    participationDates: newParticipationDates
+  }
+  
+  // Save to localStorage
+  localStorage.setItem(`userStreak_${userId}`, JSON.stringify(updatedStreak))
+  
+  // Also save to Firestore for cross-device sync (optional)
+  try {
+    await addDoc(collection(db, 'user_streaks'), {
+      userId,
+      ...updatedStreak,
+      updatedAt: new Date()
+    })
+  } catch (error) {
+    console.log('Could not sync streak to Firestore:', error)
+  }
+  
+  return updatedStreak
+}
+
+// Get user's current streak
+export const getUserStreak = (): UserStreak => {
+  const userId = getOrCreateUserId()
+  const storedStreak = localStorage.getItem(`userStreak_${userId}`)
+  
+  if (storedStreak) {
+    const streak = JSON.parse(storedStreak)
+    // Recalculate streak in case dates have changed
+    const { currentStreak, longestStreak } = calculateStreak(streak.participationDates)
+    return {
+      ...streak,
+      currentStreak,
+      longestStreak
+    }
+  }
+  
+  // Return default streak for new users
+  return {
+    currentStreak: 0,
+    longestStreak: 0,
+    lastParticipationDate: '',
+    totalParticipations: 0,
+    participationDates: []
+  }
+}
+
+// Check if user participated today
+export const hasParticipatedToday = (): boolean => {
+  const streak = getUserStreak()
+  return streak.participationDates.includes(getTodayDate())
+}
+
+// Get streak status for display
+export const getStreakStatus = (): { 
+  currentStreak: number, 
+  longestStreak: number, 
+  hasParticipatedToday: boolean,
+  nextMilestone: number 
+} => {
+  const streak = getUserStreak()
+  const participatedToday = hasParticipatedToday()
+  
+  // Calculate next milestone (next multiple of 5)
+  const nextMilestone = Math.ceil((streak.currentStreak + 1) / 5) * 5
+  
+  return {
+    currentStreak: streak.currentStreak,
+    longestStreak: streak.longestStreak,
+    hasParticipatedToday: participatedToday,
+    nextMilestone
+  }
 }

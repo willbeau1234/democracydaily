@@ -3,15 +3,36 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, getUserStreak } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
-import { AuthUser, UserProfile, OpinionResponse } from '@/lib/types';
 import Fire from '@/components/Fire';
 import { signOut } from 'firebase/auth';
 
+// Define types locally since the types file might not be found
+interface AuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}
+
+interface UserProfile {
+  displayName: string;
+  email: string;
+  createdAt: any; // Firestore Timestamp
+  updatedAt?: any; // Firestore Timestamp
+  profileComplete: boolean;
+}
+
+interface OpinionResponse {
+  userId: string;
+  opinionId: string;
+  stance: 'agree' | 'disagree';
+  reasoning: string;
+  timestamp: any; // Firestore Timestamp or Date
+}
+
 // GitHub-style Calendar Component
-function OpinionCalendar({ userId , onStreakCalculated}: { userId: string; onStreakCalculated?: (streak: number) => void;
-  }) {
+function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStreakCalculated?: (streak: number) => void; }) {
   const [responses, setResponses] = useState<OpinionResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentStreak, setCurrentStreak] = useState(0);
@@ -24,36 +45,6 @@ function OpinionCalendar({ userId , onStreakCalculated}: { userId: string; onStr
       return null;
     }
     return id;
-  }
-  const calculateStreak = (userResponses: OpinionResponse[])=> {
-    if (userResponses.length === 0) return 0;
-    
-    const responseDates = new Set<string>();
-    userResponses.forEach(response => {
-      const dateStr = getDateFromResponse(response);
-      if (dateStr) {
-        responseDates.add(dateStr);
-      }
-    });
-    
-    const sortedDates = Array.from(responseDates).sort().reverse();
-    const today = new Date();
-    let streak = 0;
-    let currentDate = new Date(today);
-
-    for(let i = 0; i < 365; i++) {
-      const dateStr = toYYYYMMDD(currentDate);
-      if (sortedDates.includes(dateStr)) {
-        streak++;
-      } else {
-        if(streak > 0) {
-          break;
-        }
-      }
-      currentDate.setDate(currentDate.getDate() - 1);
-    }
-    
-    return streak;
   }
 
   useEffect(() => {
@@ -72,23 +63,69 @@ function OpinionCalendar({ userId , onStreakCalculated}: { userId: string; onStr
         return;
       }
       
+      console.log('🔍 Using anonymous user ID:', anonUserId);
+      
+      // Fetch daily opinion responses
       const responsesRef = collection(db, 'responses');
-      const q = query(responsesRef, where('userId', '==', anonUserId));
-      const querySnapshot = await getDocs(q);
+      const responsesQuery = query(responsesRef, where('userId', '==', anonUserId));
+      const responsesSnapshot = await getDocs(responsesQuery);
       
       const userResponses: OpinionResponse[] = [];
-      querySnapshot.forEach((doc) => {
+      responsesSnapshot.forEach((doc) => {
         const data = doc.data() as OpinionResponse;
         userResponses.push({ ...data, userId: doc.id });
       });
-      const streak = calculateStreak(userResponses);
+      
+      console.log('📝 Daily responses found:', userResponses.length);
+      
+      // Fetch DIY votes
+      const votesRef = collection(db, 'diy_votes');
+      const votesQuery = query(votesRef, where('userId', '==', anonUserId));
+      const votesSnapshot = await getDocs(votesQuery);
+      
+      // Convert DIY votes to response-like format for streak calculation
+      votesSnapshot.forEach((doc) => {
+        const voteData = doc.data();
+        if (voteData.createdAt) {
+          // Create a response-like object from the vote
+          const voteResponse: OpinionResponse = {
+            userId: doc.id,
+            opinionId: voteData.opinionId,
+            stance: voteData.vote,
+            reasoning: voteData.comment || '',
+            timestamp: voteData.createdAt
+          };
+          userResponses.push(voteResponse);
+        }
+      });
+      
+      console.log('🗳️ DIY votes found:', votesSnapshot.size);
+      console.log('📊 Total user responses:', userResponses.length);
+      
+      // Use the proper streak calculation from Firebase functions
+      const userStreak = getUserStreak();
+      const streak = userStreak.currentStreak;
+      
+      console.log('🔥 Streak data from localStorage:', userStreak);
+      console.log('📅 Participation dates:', userStreak.participationDates);
+      console.log('🎯 Current streak:', streak);
+      
+      // Check if user has any data but streak is 0
+      if (userResponses.length > 0 && streak === 0) {
+        console.log('⚠️ User has responses but streak is 0 - checking participation dates...');
+        console.log('📅 Today\'s date:', new Date().toISOString().split('T')[0]);
+        console.log('📅 Yesterday\'s date:', new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0]);
+      }
+      
       setCurrentStreak(streak);
-      if(onStreakCalculated){
+      if (onStreakCalculated) {
         onStreakCalculated(streak);
-      };
+      }
       
       console.log('✅ Found responses:', userResponses.length);
       console.log('📋 Sample response data:', userResponses[0]);
+      console.log('🔥 Calculated streak:', streak);
+      console.log('📊 Full streak data:', userStreak);
       
       setResponses(userResponses);
     } catch (error) {
@@ -489,8 +526,8 @@ export default function ProfileView() {
               <div className="text-6xl font-bold text-black -ml-7">{userStreak}</div>
             </div>
           </div>
+          
         </div>
-  
         {/* Opinion Activity Calendar */}
         <OpinionCalendar userId="anonymous" onStreakCalculated={handleStreakCalculated} />
   

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ThumbsUp, ThumbsDown, MessageCircle, BarChart3, ArrowLeft } from 'lucide-react'
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
-import { getOpinionByToken, submitVote, subscribeToVotes, generateWordCloudData, getVotesForOpinion } from '@/lib/firebase'
+import { getOpinionByToken, submitVote, subscribeToVotes, generateWordCloudData, getVotesForOpinion, getUserIdentifier, hasUserVoted, getUserVote } from '@/lib/firebase'
 import WordCloudComponent from '@/components/WordCloud'
 
 function OpinionVotingContent() {
@@ -69,9 +69,7 @@ function OpinionVotingContent() {
           setWordCloudData(cloudData)
           
           // Check if current user has voted
-          const voterFingerprint = localStorage.getItem('voterFingerprint')
-          console.log('Current voter fingerprint:', voterFingerprint?.substring(0, 8) + '...')
-          const existingVote = initialVotes.find(vote => vote.voterFingerprint === voterFingerprint)
+          const existingVote = getUserVote(opinionData.id, initialVotes)
           console.log('Existing vote found:', existingVote)
           setUserVote(existingVote)
         } catch (voteError) {
@@ -89,8 +87,7 @@ function OpinionVotingContent() {
             setWordCloudData(cloudData)
             
             // Check if current user has voted
-            const voterFingerprint = localStorage.getItem('voterFingerprint')
-            const existingVote = votesData.find(vote => vote.voterFingerprint === voterFingerprint)
+            const existingVote = getUserVote(opinionData.id, votesData)
             setUserVote(existingVote)
           })
         } catch (error) {
@@ -107,8 +104,7 @@ function OpinionVotingContent() {
               setWordCloudData(cloudData)
               
               // Check if current user has voted
-              const voterFingerprint = localStorage.getItem('voterFingerprint')
-              const existingVote = votesData.find(vote => vote.voterFingerprint === voterFingerprint)
+              const existingVote = getUserVote(opinionData.id, votesData)
               setUserVote(existingVote)
             } catch (pollError) {
               console.error('Polling error:', pollError)
@@ -170,8 +166,7 @@ function OpinionVotingContent() {
           setWordCloudData(cloudData)
           
           // Check if current user has voted
-          const voterFingerprint = localStorage.getItem('voterFingerprint')
-          const existingVote = votesData.find(vote => vote.voterFingerprint === voterFingerprint)
+          const existingVote = getUserVote(opinion.id, votesData)
           setUserVote(existingVote)
         } catch (error) {
           console.error('Error refreshing votes after submission:', error)
