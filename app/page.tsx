@@ -418,8 +418,10 @@ const handleSubmit = async () => {
       'Content-Type': 'application/json',
     };
 
-    // Add auth token if user is signed in
+    // Add auth token if user is signed in 
     const currentUser = auth.currentUser;
+    console.log("🔍 Debug - User object:", auth.currentUser);
+    console.log("🔍 Debug - Auth ready:", !!auth.currentUser);
     if (currentUser) {
       try {
         const token = await currentUser.getIdToken();
@@ -692,8 +694,13 @@ const handleLogIn = async () => {
   
   const checkIfAlreadySubmitted = async () => {
     try {
-      const userId = getOrCreateUserId();
-      
+      let userId = "anonymous";
+      const currentUser = auth.currentUser;
+      if(currentUser){
+        userId = currentUser.uid;
+        console.log("Authenticated user ID:", userId);
+      }
+  
       if (!userId) {
         console.log("No user ID available, skipping submission check");
         return;
@@ -727,9 +734,12 @@ const handleLogIn = async () => {
   };
 useEffect(() => {
   if (typeof window !== 'undefined') {
-    checkIfAlreadySubmitted();
+    const timer = setTimeout(() => {
+      checkIfAlreadySubmitted();
+    }, 500);
+    return () => clearTimeout(timer);
   }
-}, []);
+}, [user]);
 
   const shareToTwitter = () => {
     const text = encodeURIComponent(

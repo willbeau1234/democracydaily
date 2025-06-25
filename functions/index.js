@@ -89,10 +89,11 @@ exports.submitResponse = functions.https.onRequest({
         message: "Response updated successfully (no duplicate created)",
         responseId: existingDoc.id,
         updated: true,
+        userType: authenticatedUserId ? "authenticated" : "anonymous",
       });
       return;
     }
-  
+    
 
     // CREATE NEW RESPONSE (ONLY IF NO EXISTING RESPONSE)
     console.log("CREATING new response - no existing response found");
@@ -114,6 +115,7 @@ exports.submitResponse = functions.https.onRequest({
       message: "New response created successfully",
       responseId: docRef.id,
       updated: false,
+      userType: authenticatedUserId ? "authenticated" : "anonymous",
     });
   } catch (error) {
     console.error("Error submitting response:", error);

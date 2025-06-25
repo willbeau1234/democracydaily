@@ -119,7 +119,7 @@ export async function submitResponse(
         opinionId,
         stance,
         reasoning,
-        // REMOVED: Don't send userId in body - server determines it from auth token
+       
       }),
     });
 
