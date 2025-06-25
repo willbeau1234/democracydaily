@@ -36,31 +36,11 @@ function OpinionVotingContent() {
 
     const loadOpinionAndVotes = async () => {
       try {
-        console.log('🚀 Loading opinion and votes in parallel...')
+        console.log('🚀 Loading opinion...')
         
-        // OPTIMIZATION 1: Load opinion and votes in parallel using Promise.all
-        const [opinionData, votesData] = await Promise.all([
-          getOpinionByToken(token),
-          // Only try to get votes if we have a reasonable expectation it will work
-          new Promise(async (resolve) => {
-            try {
-              // Try to get a temporary opinion ID to load votes
-              const tempOpinion = await getOpinionByToken(token)
-              if (tempOpinion?.id) {
-                const votes = await getVotesForOpinion(tempOpinion.id)
-                resolve(votes)
-              } else {
-                resolve([])
-              }
-            } catch (error) {
-              console.log('Initial votes load failed, will retry after opinion loads:', error)
-              resolve([])
-            }
-          })
-        ])
-
-        console.log('✅ Parallel loading complete')
-
+        // Load opinion first
+        const opinionData = await getOpinionByToken(token)
+        
         if (!opinionData) {
           toast({
             title: "Opinion not found",
@@ -70,46 +50,38 @@ function OpinionVotingContent() {
           setLoading(false)
           return
         }
-
-        setOpinion(opinionData)
         
-        // If we got votes from parallel loading, use them
-        let initialVotes = votesData as any[]
-        
-        // If parallel votes loading failed, try again now that we have opinion
-        if (!initialVotes || initialVotes.length === 0) {
-          try {
-            console.log('🔄 Retrying votes load...')
-            initialVotes = await getVotesForOpinion(opinionData.id)
-          } catch (voteError) {
-            console.error('Error loading votes:', voteError)
-            initialVotes = []
-          }
+        console.log('📊 Loading votes...')
+        let initialVotes = []
+        try {
+          initialVotes = await getVotesForOpinion(opinionData.id)
+        } catch (voteError) {
+          console.error('Error loading votes:', voteError)
+          initialVotes = []
         }
-
+        
+        // Set all the state
+        setOpinion(opinionData)
         setVotes(initialVotes)
-        
-        
         
         const existingVote = getUserVote(opinionData.id, initialVotes)
         setUserVote(existingVote)
       
+        // Set up real-time subscription
         try {
           unsubscribe = subscribeToVotes(opinionData.id, (votesData) => {
             setVotes(votesData)
-            
-            // Update dependent data
             const existingVote = getUserVote(opinionData.id, votesData)
             setUserVote(existingVote)
           })
         } catch (error) {
           console.log('Real-time subscription failed:', error)
-          // OPTIMIZATION 4: Simplified fallback - only poll if real-time fails completely
         }
         
         setLoading(false)
         
       } catch (error) {
+        console.error('Error loading opinion:', error)
         toast({
           title: "Error loading opinion",
           description: "Please try again later.",
@@ -161,7 +133,6 @@ function OpinionVotingContent() {
       const updatedVotes = [newVote, ...votes]
       setVotes(updatedVotes)
       setUserVote(newVote)
-      e
       
       
       // The real-time subscription will update with actual data shortly
