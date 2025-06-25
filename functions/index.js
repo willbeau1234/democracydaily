@@ -14,10 +14,12 @@ const db = admin.firestore();
 exports.submitResponse = functions.https.onRequest({
   cors: true,
 }, async (req, res) => {
+
   try {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    
 
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -28,8 +30,22 @@ exports.submitResponse = functions.https.onRequest({
       res.status(405).send("Method not allowed");
       return;
     }
+    let authenticatedUserId = "anonymous";
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        authenticatedUserId = decodedToken.uid;
+        console.log("Authenticated user:", authenticatedUserId);
+      } catch (error) {
+        console.log("Invalid token, treating as guest:", error.message);
+        // Continue as anonymous guest
+      }
+    } else {
+      console.log("No authorization header, treating as guest");
+    }
 
-    const {opinionId, stance, reasoning, userId} = req.body;
+    const {opinionId, stance, reasoning} = req.body;
 
     if (!opinionId || !stance || !reasoning) {
       res.status(400).json({error: "Missing required fields"});
@@ -45,11 +61,11 @@ exports.submitResponse = functions.https.onRequest({
     const responsesRef = db.collection("responses");
     const existingResponseQuery = responsesRef
         .where("opinionId", "==", opinionId)
-        .where("userId", "==", userId || "anonymous");
+        .where("userId", "==", authenticatedUserId || "anonymous");
 
     const existingSnapshot = await existingResponseQuery.get();
 
-    console.log("Checking for existing responses for user:", userId);
+    console.log("Checking for existing responses for user:", authenticatedUserId);
     console.log("Found:", existingSnapshot.size);
 
     if (!existingSnapshot.empty) {
@@ -76,6 +92,7 @@ exports.submitResponse = functions.https.onRequest({
       });
       return;
     }
+  
 
     // CREATE NEW RESPONSE (ONLY IF NO EXISTING RESPONSE)
     console.log("CREATING new response - no existing response found");
@@ -84,7 +101,7 @@ exports.submitResponse = functions.https.onRequest({
       opinionId,
       stance,
       reasoning: reasoning.trim(),
-      userId: userId || "anonymous",
+      userId: authenticatedUserId || "anonymous",
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: new Date().toISOString(),
     };
@@ -387,13 +404,11 @@ exports.midnightReset = functions.scheduler.onSchedule({
   timeZone: "America/Chicago",
 }, async (context) => {
   try {
-    const today = new Date().toISOString().split("T")[0];
-    const yesterday = new Date();
+    const chicagoTime = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"});
+    const today = new Date(chicagoTime).toISOString().split("T")[0];
+    const yesterday = new Date(chicagoTime);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-    console.log(`Running midnight reset: ${yesterdayStr} → ${today}`);
-
     // Deactivate yesterday's opinion
     const opinionsRef = db.collection("dailyOpinions");
     const yesterdayOpinionsQuery = opinionsRef.where("isActive", "==", true);
@@ -410,7 +425,7 @@ exports.midnightReset = functions.scheduler.onSchedule({
     // Archive yesterday's responses
     const responsesRef = db.collection("responses");
     const yesterdayResponses = await responsesRef
-        .where("opinionId", "==", yesterdayStr)
+        .where("opinionId", "==", today)
         .get();
 
     const archiveRef = db.collection("archivedResponses");
@@ -423,8 +438,6 @@ exports.midnightReset = functions.scheduler.onSchedule({
       batch.delete(doc.ref);
     });
     await batch.commit();
-    console.log(`Deactivated yesterday's opinions and archived responses`);
-
     // Activate today's opinion
     const activationResult = await activateNextOpinion();
     console.log("Opinion activation result:", activationResult);
