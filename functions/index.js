@@ -30,13 +30,18 @@ exports.submitResponse = functions.https.onRequest({
       res.status(405).send("Method not allowed");
       return;
     }
-    let authenticatedUserId = "anonymous";
+    let userId = "anonymous";
+    let userType = "guest";
+    let userDisplayName = null;
+    let userEmail = null;
     if (req.headers.authorization) {
       try {
         const token = req.headers.authorization.split(' ')[1];
         const decodedToken = await admin.auth().verifyIdToken(token);
-        authenticatedUserId = decodedToken.uid;
-        console.log("Authenticated user:", authenticatedUserId);
+        userId = decodedToken.uid;
+        userType = "authenticated";
+        userDisplayName = decodedToken.name || null;
+        userEmail = decodedToken.email || null;
       } catch (error) {
         console.log("Invalid token, treating as guest:", error.message);
         // Continue as anonymous guest
@@ -61,11 +66,10 @@ exports.submitResponse = functions.https.onRequest({
     const responsesRef = db.collection("responses");
     const existingResponseQuery = responsesRef
         .where("opinionId", "==", opinionId)
-        .where("userId", "==", authenticatedUserId || "anonymous");
+        .where("userId", "==", userId);
 
     const existingSnapshot = await existingResponseQuery.get();
 
-    console.log("Checking for existing responses for user:", authenticatedUserId);
     console.log("Found:", existingSnapshot.size);
 
     if (!existingSnapshot.empty) {
@@ -89,7 +93,7 @@ exports.submitResponse = functions.https.onRequest({
         message: "Response updated successfully (no duplicate created)",
         responseId: existingDoc.id,
         updated: true,
-        userType: authenticatedUserId ? "authenticated" : "anonymous",
+        userType: userType
       });
       return;
     }
@@ -102,12 +106,26 @@ exports.submitResponse = functions.https.onRequest({
       opinionId,
       stance,
       reasoning: reasoning.trim(),
-      userId: authenticatedUserId || "anonymous",
+      userId,
+      userType,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       createdAt: new Date().toISOString(),
+      charactarCount: reasoning.trim().length,
+      userDisplayName,
+      userEmail,
+      submissionMethod: "web",
+      browserInfo: req.headers['user-agent']?.split(' ')[0] || "unknown"
     };
 
     const docRef = await responsesRef.add(responseData);
+    if (userType === "authenticated") {
+      await updateUserSummary(userId, {
+        id: docRef.id,
+        opinionId,
+        stance,
+        timestamp: new Date().toISOString()
+      });
+    }
     await updateOpinionStats(opinionId);
 
     res.json({
@@ -115,7 +133,7 @@ exports.submitResponse = functions.https.onRequest({
       message: "New response created successfully",
       responseId: docRef.id,
       updated: false,
-      userType: authenticatedUserId ? "authenticated" : "anonymous",
+      userType: userType,
     });
   } catch (error) {
     console.error("Error submitting response:", error);
@@ -427,7 +445,7 @@ exports.midnightReset = functions.scheduler.onSchedule({
     // Archive yesterday's responses
     const responsesRef = db.collection("responses");
     const yesterdayResponses = await responsesRef
-        .where("opinionId", "==", today)
+        .where("opinionId", "==", yesterdayStr)
         .get();
 
     const archiveRef = db.collection("archivedResponses");
@@ -943,3 +961,111 @@ exports.getDIYVotes = functions.https.onRequest({
     res.status(500).json({success: false, error: error.message});
   }
 });
+async function updateUserSummary(userId, responseData) {
+  try {
+    const summaryRef = db.collection("userSummaries").doc(userId);
+    const summaryDoc = await summaryRef.get();
+    
+    let summaryData;
+    
+    if (summaryDoc.exists) {
+      // Update existing summary
+      summaryData = summaryDoc.data();
+      
+      // Update counters
+      const isNewDate = !summaryData.participationDates.includes(responseData.opinionId);
+      if (isNewDate) {
+        summaryData.totalResponses = (summaryData.totalResponses || 0) + 1;
+        summaryData.stats[`${responseData.stance}Count`] = (summaryData.stats[`${responseData.stance}Count`] || 0) + 1;
+      }
+      summaryData.stats[`${responseData.stance}Count`] = (summaryData.stats[`${responseData.stance}Count`] || 0) + 1;
+      
+      // Update response tracking
+      summaryData.responsesByDate = summaryData.responsesByDate || {};
+      summaryData.responsesByDate[responseData.opinionId] = responseData.id;
+
+      summaryData.stancesByDate = summaryData.stancesByDate || {};
+      summaryData.stancesByDate[responseData.opinionId] = responseData.stance;
+      
+      // Update participation dates for streak calculation
+      summaryData.participationDates = summaryData.participationDates || [];
+      if (!summaryData.participationDates.includes(responseData.opinionId)) {
+        summaryData.participationDates.push(responseData.opinionId);
+        summaryData.participationDates.sort(); // Keep sorted
+      }
+      
+      summaryData.lastResponse = responseData.opinionId;
+      summaryData.lastResponseTime = responseData.timestamp;
+      
+    } else {
+      // Create new summary
+      summaryData = {
+        userId,
+        totalResponses: 1,
+        firstResponse: responseData.opinionId,
+        lastResponse: responseData.opinionId,
+        lastResponseTime: responseData.timestamp,
+        responsesByDate: {
+          [responseData.opinionId]: responseData.id
+        },
+        stancesByDate: {
+          [responseData.opinionId]: responseData.stance
+        },
+        stats: {
+          agreeCount: responseData.stance === 'agree' ? 1 : 0,
+          disagreeCount: responseData.stance === 'disagree' ? 1 : 0,
+          avgCharacterCount: 0 // Calculate later if needed
+        },
+        participationDates: [responseData.opinionId],
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+    }
+    
+    // Calculate current streak
+    summaryData.currentStreak = calculateStreakFromDates(summaryData.participationDates);
+    summaryData.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    
+    await summaryRef.set(summaryData, { merge: true });
+    
+    console.log(`✅ Updated user summary for ${userId}: ${summaryData.totalResponses} total responses`);
+    
+  } catch (error) {
+    console.error("❌ Error updating user summary:", error);
+    // Don't fail the main response if summary update fails
+  }
+}
+
+// Helper function to calculate streak from participation dates
+function calculateStreakFromDates(participationDates) {
+  if (!participationDates || participationDates.length === 0) {
+    return 0;
+  }
+  
+  const today = new Date().toISOString().split('T')[0];
+  const sortedDates = participationDates.slice().sort().reverse(); // Most recent first
+  
+  // Check if user participated today or yesterday to have an active streak
+  const hasRecentParticipation = sortedDates[0] === today || 
+    sortedDates[0] === new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0];
+  
+  if (!hasRecentParticipation) {
+    return 0;
+  }
+  
+  let streak = 0;
+  let expectedDate = sortedDates[0];
+  
+  for (const date of sortedDates) {
+    if (date === expectedDate) {
+      streak++;
+      // Move to previous day
+      const prevDate = new Date(expectedDate);
+      prevDate.setDate(prevDate.getDate() - 1);
+      expectedDate = prevDate.toISOString().split('T')[0];
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}

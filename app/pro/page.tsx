@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Fire from '@/components/Fire';
 import { signOut } from 'firebase/auth';
 
-// Define types locally since the types file might not be found
+// Define types
 interface AuthUser {
   uid: string;
   email: string | null;
@@ -23,127 +23,146 @@ interface UserProfile {
   profileComplete: boolean;
 }
 
-interface OpinionResponse {
+interface UserSummary {
   userId: string;
-  opinionId: string;
-  stance: 'agree' | 'disagree';
-  reasoning: string;
-  timestamp: any; // Firestore Timestamp or Date
+  totalResponses: number;
+  firstResponse: string;
+  lastResponse: string;
+  lastResponseTime: string;
+  responsesByDate: Record<string, string>; // opinionId -> responseId
+  stats: {
+    agreeCount: number;
+    disagreeCount: number;
+    avgCharacterCount?: number;
+  };
+  participationDates: string[]; // Array of date strings (opinionIds)
+  currentStreak: number;
+  createdAt: any;
+  updatedAt: any;
 }
 
-// GitHub-style Calendar Component
+// Enhanced Calendar Component with extensive debugging
 function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStreakCalculated?: (streak: number) => void; }) {
-  const [responses, setResponses] = useState<OpinionResponse[]>([]);
+  const [userSummary, setUserSummary] = useState<UserSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentStreak, setCurrentStreak] = useState(0);
-
-  // Get anonymous user ID (same logic as your opinion game)
-  function getOrCreateUserId() {
-    let id = localStorage.getItem("anonUserId");
-    if (!id) {
-      // If no anonymous ID exists, we can't show calendar data
-      return null;
-    }
-    return id;
-  }
+  const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>({});
 
   useEffect(() => {
-    fetchUserResponses();
+    fetchUserSummary();
   }, [userId]);
 
-  const fetchUserResponses = async () => {
+  const fetchUserSummary = async () => {
     try {
-      console.log('📅 Fetching user responses for calendar...');
+      console.log('🚀 STARTING fetchUserSummary...');
+      console.log('📋 User ID provided:', userId);
       
-      // Use the anonymous user ID instead of Firebase auth ID
-      const anonUserId = getOrCreateUserId();
-      if (!anonUserId) {
-        console.log('No anonymous user ID found');
+      setError(null);
+      setLoading(true);
+      
+      if (!userId) {
+        console.log('❌ No user ID provided');
+        setError('No user ID provided');
         setLoading(false);
         return;
       }
       
-      console.log('🔍 Using anonymous user ID:', anonUserId);
+      console.log('🔍 Fetching document: userSummaries/' + userId);
       
-      // Fetch daily opinion responses
-      const responsesRef = collection(db, 'responses');
-      const responsesQuery = query(responsesRef, where('userId', '==', anonUserId));
-      const responsesSnapshot = await getDocs(responsesQuery);
+      // Try to fetch the userSummaries document
+      const summaryDoc = await getDoc(doc(db, 'userSummaries', userId));
       
-      const userResponses: OpinionResponse[] = [];
-      responsesSnapshot.forEach((doc) => {
-        const data = doc.data() as OpinionResponse;
-        userResponses.push({ ...data, userId: doc.id });
-      });
+      console.log('📄 Document exists:', summaryDoc.exists());
       
-      console.log('📝 Daily responses found:', userResponses.length);
-      
-      // Fetch DIY votes
-      const votesRef = collection(db, 'diy_votes');
-      const votesQuery = query(votesRef, where('userId', '==', anonUserId));
-      const votesSnapshot = await getDocs(votesQuery);
-      
-      // Convert DIY votes to response-like format for streak calculation
-      votesSnapshot.forEach((doc) => {
-        const voteData = doc.data();
-        if (voteData.createdAt) {
-          // Create a response-like object from the vote
-          const voteResponse: OpinionResponse = {
-            userId: doc.id,
-            opinionId: voteData.opinionId,
-            stance: voteData.vote,
-            reasoning: voteData.comment || '',
-            timestamp: voteData.createdAt
+      if (summaryDoc.exists()) {
+        const summaryData = summaryDoc.data();
+        console.log('✅ Raw document data:', summaryData);
+        
+        // Validate the data structure
+        const isValidData = summaryData && 
+          typeof summaryData.totalResponses === 'number' &&
+          Array.isArray(summaryData.participationDates) &&
+          typeof summaryData.currentStreak === 'number';
+        
+        console.log('📊 Data validation passed:', isValidData);
+        
+        if (isValidData) {
+          // Fetch individual response stances using responsesByDate mapping
+          const responseStances: Record<string, string> = {};
+          
+          if (summaryData.responsesByDate) {
+            console.log('🔍 Fetching individual response stances...');
+            
+            for (const [opinionId, responseId] of Object.entries(summaryData.responsesByDate)) {
+              try {
+                const responseDoc = await getDoc(doc(db, 'responses', responseId as string));
+                if (responseDoc.exists()) {
+                  const responseData = responseDoc.data();
+                  responseStances[opinionId] = responseData.stance;
+                  console.log(`📊 ${opinionId}: ${responseData.stance}`);
+                }
+              } catch (err) {
+                console.log(`⚠️ Could not fetch response ${responseId}:`, err);
+              }
+            }
+          }
+          
+          // Add stance data to summary
+          const enhancedSummary = {
+            ...summaryData,
+            stancesByDate: responseStances
           };
-          userResponses.push(voteResponse);
+          
+          setUserSummary(enhancedSummary as UserSummary & { stancesByDate: Record<string, string> });
+          console.log('🔥 Setting streak to:', summaryData.currentStreak);
+          
+          if (onStreakCalculated) {
+            onStreakCalculated(summaryData.currentStreak);
+          }
+          
+          setDebugInfo({
+            documentExists: true,
+            totalResponses: summaryData.totalResponses,
+            participationDates: summaryData.participationDates,
+            currentStreak: summaryData.currentStreak,
+            stats: summaryData.stats,
+            stancesByDate: responseStances
+          });
+        } else {
+          console.log('❌ Invalid data structure:', summaryData);
+          setError('Invalid user summary data structure');
         }
-      });
-      
-      console.log('🗳️ DIY votes found:', votesSnapshot.size);
-      console.log('📊 Total user responses:', userResponses.length);
-      
-      setResponses(userResponses);
-      
-      // Generate calendar data and calculate streak from consecutive green blocks
-      const calendarData = generateCalendarData(userResponses);
-      const calculatedStreak = calculateStreakFromCalendar(calendarData);
-      
-      console.log('🔥 Calculated streak from calendar:', calculatedStreak);
-      
-      setCurrentStreak(calculatedStreak);
-      if (onStreakCalculated) {
-        onStreakCalculated(calculatedStreak);
+      } else {
+        console.log('❌ No userSummaries document found for user:', userId);
+        setError('No user activity data found. Submit your first opinion to start tracking!');
+        setUserSummary(null);
+        
+        setDebugInfo({
+          documentExists: false,
+          message: 'No userSummaries document found'
+        });
+        
+        if (onStreakCalculated) {
+          onStreakCalculated(0);
+        }
       }
       
     } catch (error) {
-      console.error('❌ Error fetching responses:', error);
+      console.error('💥 Error fetching user summary:', error);
+      setError(`Failed to load activity data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      setDebugInfo({
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : null
+      });
+      
+      if (onStreakCalculated) {
+        onStreakCalculated(0);
+      }
     } finally {
       setLoading(false);
+      console.log('🏁 fetchUserSummary completed');
     }
-  };
-
-  // Get intensity based on response length using OpinionResponse interface
-  const getIntensity = (response: OpinionResponse): number => {
-    if (!response.reasoning) return 0;
-    
-    const length = response.reasoning.length;
-    if (length === 0) return 0;
-    if (length < 50) return 1;
-    if (length < 150) return 2;
-    if (length < 300) return 3;
-    return 4;
-  };
-
-  // Get CSS class for intensity
-  const getIntensityClass = (intensity: number): string => {
-    const classes = [
-      'bg-gray-100',
-      'bg-green-200',
-      'bg-green-300',
-      'bg-green-500',
-      'bg-green-700'
-    ];
-    return classes[intensity] || classes[0];
   };
 
   // Helper to get YYYY-MM-DD string in local timezone
@@ -154,138 +173,65 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
     return `${year}-${month}-${day}`;
   };
 
-  // Get date from OpinionResponse - opinionId is the date string
-  const getDateFromResponse = (response: OpinionResponse): string | null => {
-    try {
-      // opinionId should be a date string like "2025-01-15"
-      if (response.opinionId && typeof response.opinionId === 'string') {
-        // Check if it's already in YYYY-MM-DD format
-        const dateMatch = response.opinionId.match(/^\d{4}-\d{2}-\d{2}$/);
-        if (dateMatch) {
-          return response.opinionId;
-        }
-        
-        // Try to parse as a date if it's in a different format
-        const parsedDate = new Date(response.opinionId);
-        if (!isNaN(parsedDate.getTime())) {
-          return toYYYYMMDD(parsedDate);
-        }
-      }
-      
-      // Fallback to timestamp if opinionId doesn't work
-      if (response.timestamp) {
-        let date: Date | null = null;
-        
-        if (response.timestamp.seconds) {
-          date = new Date(response.timestamp.seconds * 1000);
-        } else if (response.timestamp.toDate) {
-          date = response.timestamp.toDate();
-        } else if (typeof response.timestamp === 'string') {
-          date = new Date(response.timestamp);
-        } else if (response.timestamp instanceof Date) {
-          date = response.timestamp;
-        }
-        
-        if (date && !isNaN(date.getTime())) {
-          return toYYYYMMDD(date);
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error parsing date from response:', error);
-      return null;
-    }
-  };
-
-  // Generate calendar data
-  const generateCalendarData = (userResponses: OpinionResponse[]) => {
+  // Generate calendar data from user summary
+  const generateCalendarData = (summary: (UserSummary & { stancesByDate?: Record<string, string> }) | null) => {
+    console.log('🗓️ Generating calendar data for summary:', summary);
+    
     const today = new Date();
-    const currentYear = today.getFullYear();
-    const endDate = new Date(2026, 3, 29); // End of the current year
+    const endDate = new Date(2026, 3, 29);
     
     // Start from the beginning of the current month's first week
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    // Find the Sunday of the week that contains the first day of the month
     const startDate = new Date(firstDayOfMonth);
-    const dayOfWeek = startDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    startDate.setDate(startDate.getDate() - dayOfWeek); // Go back to the Sunday
+    const dayOfWeek = startDate.getDay();
+    startDate.setDate(startDate.getDate() - dayOfWeek);
     
     const days = [];
     const current = new Date(startDate);
     
-    // Create a map of date strings to responses for faster lookup
-    const responsesByDate = new Map<string, OpinionResponse[]>();
+    // Create a set of participation dates for faster lookup
+    const participationDatesSet = new Set(summary?.participationDates || []);
+    const stancesByDate = summary?.stancesByDate || {};
+    console.log('🎯 Participation dates set:', participationDatesSet);
+    console.log('🎯 Stances by date:', stancesByDate);
     
-    userResponses.forEach(response => {
-      const dateStr = getDateFromResponse(response);
-      if (dateStr) {
-        if (!responsesByDate.has(dateStr)) {
-          responsesByDate.set(dateStr, []);
-        }
-        responsesByDate.get(dateStr)!.push(response);
-      }
-    });
-    
-    // Generate days from the aligned start date to the end of the year
+    // Generate days
     while (current <= endDate) {
       const dateStr = toYYYYMMDD(current);
-      const dayResponses = responsesByDate.get(dateStr) || [];
-      
-      const response = dayResponses.length > 0 ? dayResponses[0] : null;
-      const totalIntensity = dayResponses.reduce((sum, r) => 
-        sum + getIntensity(r), 0
-      );
+      const hasParticipated = participationDatesSet.has(dateStr);
+      const stance = stancesByDate[dateStr] || null;
       
       days.push({
         date: new Date(current),
         dateStr: dateStr,
-        response: response,
-        allResponses: dayResponses,
-        intensity: dayResponses.length > 0 ? Math.min(4, Math.max(1, Math.ceil(totalIntensity / dayResponses.length))) : 0
+        hasParticipated: hasParticipated,
+        stance: stance,
+        intensity: hasParticipated ? 1 : 0
       });
       
       current.setDate(current.getDate() + 1);
     }
     
+    console.log('📅 Generated', days.length, 'calendar days');
     return days;
   };
 
-  // Calculate streak from consecutive green blocks in calendar
-  const calculateStreakFromCalendar = (calendarData: any[]) => {
-    const today = new Date();
-    const todayStr = toYYYYMMDD(today);
-    
-    let streak = 0;
-    let currentDate = new Date(today);
-    
-    // Count backwards from today until we hit a non-green day
-    while (true) {
-      const dateStr = toYYYYMMDD(currentDate);
-      
-      // Find this date in calendar data
-      const dayData = calendarData.find(day => day.dateStr === dateStr);
-      
-      // If no data for this day, or intensity is 0 (no response), break streak
-      if (!dayData || dayData.intensity === 0) {
-        break;
-      }
-      
-      // This day has activity (green square), increment streak
-      streak++;
-      
-      // Move to previous day
-      currentDate.setDate(currentDate.getDate() - 1);
-      
-      // Safety: don't go back more than 365 days
-      if (streak > 365) break;
+  // Get CSS class based on stance
+  const getIntensityClass = (day: any): string => {
+    if (!day || !day.hasParticipated) {
+      return 'bg-gray-100'; // No participation
     }
     
-    return streak;
+    if (day.stance === 'agree') {
+      return 'bg-green-500'; // Green for agree
+    } else if (day.stance === 'disagree') {
+      return 'bg-red-500'; // Red for disagree
+    } else {
+      return 'bg-blue-300'; // Fallback blue if stance is unknown
+    }
   };
 
-  // Group days into weeks (starting from Sunday)
+  // Group days into weeks
   const groupIntoWeeks = (calendarData: any[]) => {
     const weeks: any[][] = [];
     
@@ -315,19 +261,11 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
     return weeks;
   };
 
-  const calendarData = generateCalendarData(responses);
+  const calendarData = generateCalendarData(userSummary);
   const weeks = groupIntoWeeks(calendarData);
-  
-  // The data is already in week-based chunks. For a column-flow grid,
-  // we just need to flatten it. Transposing is not necessary here.
   const displayDays = weeks.flat();
 
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  const totalResponses = responses.length;
-  const averageLength = responses.length > 0 
-    ? Math.round(responses.reduce((sum, r) => sum + r.reasoning.length, 0) / responses.length)
-    : 0;
 
   // Generate month labels
   const monthLabels = React.useMemo(() => {
@@ -337,13 +275,11 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
     let lastMonth = -1;
 
     weeks.forEach((week, weekIndex) => {
-      // Find a day in the middle of the week to determine the month
       const dayForMonth = week.find((d, i) => d && i > 2) || week.find(d => d);
 
       if (dayForMonth) {
         const month = dayForMonth.date.getMonth();
         if (month !== lastMonth) {
-          // Check if it's a new month and not too close to the previous label
           if (labels.length === 0 || weekIndex > 2) {
              const lastLabel = labels[labels.length - 1];
              if (!lastLabel || weekIndex > lastLabel.startColumn + 3) {
@@ -366,6 +302,50 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
       <div className="border rounded-lg p-6 bg-white">
         <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity</h4>
         <div className="text-gray-500">Loading your activity...</div>
+        <div className="text-xs text-gray-400 mt-2">Fetching data from userSummaries/{userId}</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="border rounded-lg p-6 bg-white">
+        <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity</h4>
+        <div className="text-red-600 mb-4">{error}</div>
+        
+        {/* Debug Information */}
+        <details className="text-xs text-gray-500">
+          <summary className="cursor-pointer">Debug Info</summary>
+          <pre className="mt-2 bg-gray-100 p-2 rounded text-xs overflow-auto">
+            {JSON.stringify(debugInfo, null, 2)}
+          </pre>
+        </details>
+        
+        <button 
+          onClick={fetchUserSummary}
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!userSummary) {
+    return (
+      <div className="border rounded-lg p-6 bg-white">
+        <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity</h4>
+        <div className="text-gray-500 mb-4">
+          No activity data found. Submit your first opinion response to start tracking your activity!
+        </div>
+        
+        {/* Debug Information */}
+        <details className="text-xs text-gray-500">
+          <summary className="cursor-pointer">Debug Info</summary>
+          <pre className="mt-2 bg-gray-100 p-2 rounded text-xs overflow-auto">
+            {JSON.stringify(debugInfo, null, 2)}
+          </pre>
+        </details>
       </div>
     );
   }
@@ -374,15 +354,33 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
     <div className="border rounded-lg p-6 bg-white">
       <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity</h4>
 
-      {/* Stats */}
+      {/* Stats from UserSummary */}
       <div className="mb-4 flex flex-wrap gap-6 text-sm text-gray-600">
         <div>
-          <strong>{totalResponses}</strong> opinions shared
+          <strong>{userSummary.totalResponses}</strong> opinions shared
         </div>
         <div>
-          <strong>{averageLength}</strong> average characters per response
+          <strong>{userSummary.stats.agreeCount}</strong> agree responses
+        </div>
+        <div>
+          <strong>{userSummary.stats.disagreeCount}</strong> disagree responses
+        </div>
+        <div>
+          <strong>{userSummary.currentStreak}</strong> day streak
         </div>
       </div>
+      
+      {/* Debug info in development */}
+      <details className="text-xs text-gray-400 mb-4">
+        <summary className="cursor-pointer">Debug Info</summary>
+        <div className="mt-2">
+          <div>Participation dates: {userSummary.participationDates.join(', ')}</div>
+          <div>Stances by date: {JSON.stringify((userSummary as any).stancesByDate || {})}</div>
+          <div>Calendar days with activity: {calendarData.filter(d => d.hasParticipated).length}</div>
+          <div>Green (agree) days: {calendarData.filter(d => d.stance === 'agree').length}</div>
+          <div>Red (disagree) days: {calendarData.filter(d => d.stance === 'disagree').length}</div>
+        </div>
+      </details>
       
       {/* Calendar Grid */}
       <div className="mb-4 overflow-x-auto">
@@ -392,7 +390,7 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
             {monthLabels.map((month, i) => {
               const prevMonth = monthLabels[i - 1];
               const marginLeft = prevMonth 
-                ? (month.startColumn - prevMonth.startColumn) * 16 // 12px width + 4px gap
+                ? (month.startColumn - prevMonth.startColumn) * 16
                 : month.startColumn * 16;
               
               return (
@@ -420,12 +418,10 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
                 <div
                   key={index}
                   className={`w-3 h-3 rounded-sm border border-gray-200 hover:ring-1 hover:ring-blue-300 cursor-pointer ${
-                    day ? getIntensityClass(day.intensity) : 'bg-gray-50'
+                    day ? getIntensityClass(day) : 'bg-gray-50'
                   }`}
                   title={day ? `${day.date.toLocaleDateString()}: ${
-                    day.allResponses && day.allResponses.length > 0
-                      ? `${day.allResponses.length} response(s) - ${day.allResponses.map((r: { stance: any; }) => r.stance).join(', ')}`
-                      : 'No response'
+                    day.hasParticipated ? `${day.stance} stance` : 'No response'
                   }` : ''}
                 />
               ))}
@@ -436,21 +432,28 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
       
       {/* Legend */}
       <div className="flex items-center justify-between text-xs text-gray-600">
-        <span>Less active</span>
-        <div className="flex gap-1">
-          <div className="w-3 h-3 bg-gray-100 border border-gray-200 rounded-sm"></div>
-          <div className="w-3 h-3 bg-green-200 border border-gray-200 rounded-sm"></div>
-          <div className="w-3 h-3 bg-green-300 border border-gray-200 rounded-sm"></div>
-          <div className="w-3 h-3 bg-green-500 border border-gray-200 rounded-sm"></div>
-          <div className="w-3 h-3 bg-green-700 border border-gray-200 rounded-sm"></div>
+        <span>No activity</span>
+        <div className="flex gap-2 items-center">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-gray-100 border border-gray-200 rounded-sm"></div>
+            <span>None</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-green-500 border border-gray-200 rounded-sm"></div>
+            <span>Agree</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-red-500 border border-gray-200 rounded-sm"></div>
+            <span>Disagree</span>
+          </div>
         </div>
-        <span>More active</span>
+        <span>Activity</span>
       </div>
     </div>
   );
 }
 
-// Main ProfileView Component - THIS IS THE DEFAULT EXPORT
+// Main ProfileView Component
 export default function ProfileView() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -459,11 +462,14 @@ export default function ProfileView() {
 
   const router = useRouter();
   const handleStreakCalculated = (streak: number) => {
+    console.log('🔥 Streak calculated in ProfileView:', streak);
     setUserStreak(streak);
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      console.log('👤 Auth state changed:', currentUser ? 'User logged in' : 'No user');
+      
       if (currentUser) {
         const authUser: AuthUser = {
           uid: currentUser.uid,
@@ -471,9 +477,11 @@ export default function ProfileView() {
           displayName: currentUser.displayName
         };
         
+        console.log('👤 Auth user object:', authUser);
         setUser(authUser);
         await fetchProfile(currentUser.uid);
       } else {
+        console.log('🚪 No user, redirecting to home');
         router.push('/');
       }
     });
@@ -532,6 +540,8 @@ export default function ProfileView() {
             </div>
           </div>
         </div>
+        
+        {/* Streak Display */}
         <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8 p-6">
           <h2 className="text-2xl font-bold mb-6 text-center">Your Streak</h2>
           <div className="flex justify-center items-center">
@@ -540,12 +550,12 @@ export default function ProfileView() {
               <div className="text-6xl font-bold text-black -ml-7">{userStreak}</div>
             </div>
           </div>
-          
         </div>
-        {/* Opinion Activity Calendar */}
-        <OpinionCalendar userId="anonymous" onStreakCalculated={handleStreakCalculated} />
+        
+        {/* Opinion Activity Calendar - With extensive debugging */}
+        <OpinionCalendar userId={user.uid} onStreakCalculated={handleStreakCalculated} />
   
-        {/* Profile Content - Moved below calendar */}
+        {/* Profile Content */}
         <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8 mt-8">
           {/* Profile Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
@@ -630,7 +640,7 @@ export default function ProfileView() {
   
         {/* Navigation Buttons */}
         <div className="mt-8 border-t pt-6">
-          <div className="flex justify-center">
+          <div className="flex justify-center gap-4">
             <button 
               onClick={() => router.push('/')}
               className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors"

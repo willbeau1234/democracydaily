@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react'
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { v4 as uuidv4 } from 'uuid'
+import { getPerformance } from 'firebase/performance'; 
 
 //  web app's Firebase configuration
 const firebaseConfig = {
@@ -35,6 +36,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
 const storage = getStorage(app)
+export const perf = typeof window !== 'undefined' ? getPerformance(app) : null;
 export { db }
 
 // EXISTING INTERFACES AND FUNCTIONS
@@ -348,7 +350,6 @@ export async function getUserResponse(userId: string, opinionId: string): Promis
   }
 }
 
-// NEW DIY OPINION FUNCTIONALITY
 export interface DIYOpinionData {
   title: string
   content: string
