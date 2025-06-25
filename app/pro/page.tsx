@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { auth, db, getUserStreak } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Fire from '@/components/Fire';
 import { signOut } from 'firebase/auth';
@@ -102,32 +102,19 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
       console.log('🗳️ DIY votes found:', votesSnapshot.size);
       console.log('📊 Total user responses:', userResponses.length);
       
-      // Use the proper streak calculation from Firebase functions
-      const userStreak = getUserStreak();
-      const streak = userStreak.currentStreak;
-      
-      console.log('🔥 Streak data from localStorage:', userStreak);
-      console.log('📅 Participation dates:', userStreak.participationDates);
-      console.log('🎯 Current streak:', streak);
-      
-      // Check if user has any data but streak is 0
-      if (userResponses.length > 0 && streak === 0) {
-        console.log('⚠️ User has responses but streak is 0 - checking participation dates...');
-        console.log('📅 Today\'s date:', new Date().toISOString().split('T')[0]);
-        console.log('📅 Yesterday\'s date:', new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0]);
-      }
-      
-      setCurrentStreak(streak);
-      if (onStreakCalculated) {
-        onStreakCalculated(streak);
-      }
-      
-      console.log('✅ Found responses:', userResponses.length);
-      console.log('📋 Sample response data:', userResponses[0]);
-      console.log('🔥 Calculated streak:', streak);
-      console.log('📊 Full streak data:', userStreak);
-      
       setResponses(userResponses);
+      
+      // Generate calendar data and calculate streak from consecutive green blocks
+      const calendarData = generateCalendarData(userResponses);
+      const calculatedStreak = calculateStreakFromCalendar(calendarData);
+      
+      console.log('🔥 Calculated streak from calendar:', calculatedStreak);
+      
+      setCurrentStreak(calculatedStreak);
+      if (onStreakCalculated) {
+        onStreakCalculated(calculatedStreak);
+      }
+      
     } catch (error) {
       console.error('❌ Error fetching responses:', error);
     } finally {
@@ -206,13 +193,13 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
       
       return null;
     } catch (error) {
-      console.error('Error parsing date from response:', error, response);
+      console.error('Error parsing date from response:', error);
       return null;
     }
   };
 
   // Generate calendar data
-  const generateCalendarData = () => {
+  const generateCalendarData = (userResponses: OpinionResponse[]) => {
     const today = new Date();
     const currentYear = today.getFullYear();
     const endDate = new Date(2026, 3, 29); // End of the current year
@@ -231,7 +218,7 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
     // Create a map of date strings to responses for faster lookup
     const responsesByDate = new Map<string, OpinionResponse[]>();
     
-    responses.forEach(response => {
+    userResponses.forEach(response => {
       const dateStr = getDateFromResponse(response);
       if (dateStr) {
         if (!responsesByDate.has(dateStr)) {
@@ -265,12 +252,41 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
     return days;
   };
 
-  // Also update the groupIntoWeeks function to be simpler since we're now starting from Sunday
-  
-  const calendarData = generateCalendarData();
-  
+  // Calculate streak from consecutive green blocks in calendar
+  const calculateStreakFromCalendar = (calendarData: any[]) => {
+    const today = new Date();
+    const todayStr = toYYYYMMDD(today);
+    
+    let streak = 0;
+    let currentDate = new Date(today);
+    
+    // Count backwards from today until we hit a non-green day
+    while (true) {
+      const dateStr = toYYYYMMDD(currentDate);
+      
+      // Find this date in calendar data
+      const dayData = calendarData.find(day => day.dateStr === dateStr);
+      
+      // If no data for this day, or intensity is 0 (no response), break streak
+      if (!dayData || dayData.intensity === 0) {
+        break;
+      }
+      
+      // This day has activity (green square), increment streak
+      streak++;
+      
+      // Move to previous day
+      currentDate.setDate(currentDate.getDate() - 1);
+      
+      // Safety: don't go back more than 365 days
+      if (streak > 365) break;
+    }
+    
+    return streak;
+  };
+
   // Group days into weeks (starting from Sunday)
-  const groupIntoWeeks = () => {
+  const groupIntoWeeks = (calendarData: any[]) => {
     const weeks: any[][] = [];
     
     if (calendarData.length === 0) return weeks;
@@ -299,7 +315,8 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
     return weeks;
   };
 
-  const weeks = groupIntoWeeks();
+  const calendarData = generateCalendarData(responses);
+  const weeks = groupIntoWeeks(calendarData);
   
   // The data is already in week-based chunks. For a column-flow grid,
   // we just need to flatten it. Transposing is not necessary here.
@@ -357,9 +374,6 @@ function OpinionCalendar({ userId, onStreakCalculated }: { userId: string; onStr
     <div className="border rounded-lg p-6 bg-white">
       <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity</h4>
 
-  
-      
-      
       {/* Stats */}
       <div className="mb-4 flex flex-wrap gap-6 text-sm text-gray-600">
         <div>
