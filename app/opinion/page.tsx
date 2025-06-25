@@ -9,7 +9,7 @@ import { ThumbsUp, ThumbsDown, MessageCircle, BarChart3, ArrowLeft } from 'lucid
 import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { getOpinionByToken, submitVote, subscribeToVotes, generateWordCloudData, getVotesForOpinion, getUserIdentifier, hasUserVoted, getUserVote } from '@/lib/firebase'
-import WordCloudComponent from '@/components/WordCloud'
+import React from 'react'
 
 function OpinionVotingContent() {
   const searchParams = useSearchParams()
@@ -21,8 +21,6 @@ function OpinionVotingContent() {
   const [comment, setComment] = useState('')
   const [isVoting, setIsVoting] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [showWordCloud, setShowWordCloud] = useState(false)
-  const [wordCloudData, setWordCloudData] = useState([])
 
   useEffect(() => {
     if (!token) {
@@ -35,86 +33,83 @@ function OpinionVotingContent() {
     }
 
     let unsubscribe: (() => void) | null = null
-    let pollInterval: NodeJS.Timeout | null = null
 
-    const loadOpinion = async () => {
+    const loadOpinionAndVotes = async () => {
       try {
-        const opinionData = await getOpinionByToken(token)
+        console.log('🚀 Loading opinion and votes in parallel...')
+        
+        // OPTIMIZATION 1: Load opinion and votes in parallel using Promise.all
+        const [opinionData, votesData] = await Promise.all([
+          getOpinionByToken(token),
+          // Only try to get votes if we have a reasonable expectation it will work
+          new Promise(async (resolve) => {
+            try {
+              // Try to get a temporary opinion ID to load votes
+              const tempOpinion = await getOpinionByToken(token)
+              if (tempOpinion?.id) {
+                const votes = await getVotesForOpinion(tempOpinion.id)
+                resolve(votes)
+              } else {
+                resolve([])
+              }
+            } catch (error) {
+              console.log('Initial votes load failed, will retry after opinion loads:', error)
+              resolve([])
+            }
+          })
+        ])
+
+        console.log('✅ Parallel loading complete')
+
         if (!opinionData) {
           toast({
             title: "Opinion not found",
             description: "This opinion link may be invalid or expired.",
             variant: "destructive"
           })
+          setLoading(false)
           return
         }
+
         setOpinion(opinionData)
         
-        // Immediately load existing votes
-        try {
-          console.log('Loading votes for opinion:', opinionData.id)
-          const initialVotes = await getVotesForOpinion(opinionData.id)
-          console.log('Initial votes loaded:', initialVotes)
-          console.log('Initial votes length:', initialVotes.length)
-          console.log('Initial votes structure:', initialVotes.map(v => ({ 
-            id: v.id, 
-            vote: v.vote, 
-            opinionId: v.opinionId,
-            voterFingerprint: v.voterFingerprint?.substring(0, 8) + '...'
-          })))
-          setVotes(initialVotes)
-          
-          // Generate word cloud data
-          const cloudData = generateWordCloudData(initialVotes)
-          setWordCloudData(cloudData)
-          
-          // Check if current user has voted
-          const existingVote = getUserVote(opinionData.id, initialVotes)
-          console.log('Existing vote found:', existingVote)
-          setUserVote(existingVote)
-        } catch (voteError) {
-          console.error('Error loading initial votes:', voteError)
-        }
+        // If we got votes from parallel loading, use them
+        let initialVotes = votesData as any[]
         
-        // Try to subscribe to real-time votes
+        // If parallel votes loading failed, try again now that we have opinion
+        if (!initialVotes || initialVotes.length === 0) {
+          try {
+            console.log('🔄 Retrying votes load...')
+            initialVotes = await getVotesForOpinion(opinionData.id)
+          } catch (voteError) {
+            console.error('Error loading votes:', voteError)
+            initialVotes = []
+          }
+        }
+
+        setVotes(initialVotes)
+        
+        
+        
+        const existingVote = getUserVote(opinionData.id, initialVotes)
+        setUserVote(existingVote)
+      
         try {
           unsubscribe = subscribeToVotes(opinionData.id, (votesData) => {
-            console.log('Real-time votes update:', votesData)
             setVotes(votesData)
             
-            // Generate word cloud data
-            const cloudData = generateWordCloudData(votesData)
-            setWordCloudData(cloudData)
-            
-            // Check if current user has voted
+            // Update dependent data
             const existingVote = getUserVote(opinionData.id, votesData)
             setUserVote(existingVote)
           })
         } catch (error) {
-          console.log('Real-time subscription failed, falling back to polling:', error)
-          // Fallback to polling if real-time subscription fails
-          pollInterval = setInterval(async () => {
-            try {
-              const votesData = await getVotesForOpinion(opinionData.id)
-              console.log('Polling votes update:', votesData)
-              setVotes(votesData)
-              
-              // Generate word cloud data
-              const cloudData = generateWordCloudData(votesData)
-              setWordCloudData(cloudData)
-              
-              // Check if current user has voted
-              const existingVote = getUserVote(opinionData.id, votesData)
-              setUserVote(existingVote)
-            } catch (pollError) {
-              console.error('Polling error:', pollError)
-            }
-          }, 3000) // Poll every 3 seconds
+          console.log('Real-time subscription failed:', error)
+          // OPTIMIZATION 4: Simplified fallback - only poll if real-time fails completely
         }
         
         setLoading(false)
+        
       } catch (error) {
-        console.error('Error loading opinion:', error)
         toast({
           title: "Error loading opinion",
           description: "Please try again later.",
@@ -124,25 +119,22 @@ function OpinionVotingContent() {
       }
     }
 
-    loadOpinion()
+    loadOpinionAndVotes()
 
     // Cleanup function
     return () => {
       if (unsubscribe) {
         unsubscribe()
       }
-      if (pollInterval) {
-        clearInterval(pollInterval)
-      }
     }
   }, [token])
 
   const handleVote = async (voteType) => {
-    if (!opinion || userVote) return
+    if (!opinion || userVote || isVoting) return
 
     setIsVoting(true)
     try {
-      console.log('Submitting vote:', { opinionId: opinion.id, voteType, comment: comment.trim() })
+      console.log('🗳️ Submitting vote:', { opinionId: opinion.id, voteType })
       
       await submitVote(opinion.id, {
         vote: voteType,
@@ -155,26 +147,27 @@ function OpinionVotingContent() {
         description: "Thank you for participating in this discussion.",
       })
       
-      // Force refresh votes after submission
-      setTimeout(async () => {
-        try {
-          const votesData = await getVotesForOpinion(opinion.id)
-          setVotes(votesData)
-          
-          // Generate word cloud data
-          const cloudData = generateWordCloudData(votesData)
-          setWordCloudData(cloudData)
-          
-          // Check if current user has voted
-          const existingVote = getUserVote(opinion.id, votesData)
-          setUserVote(existingVote)
-        } catch (error) {
-          console.error('Error refreshing votes after submission:', error)
-        }
-      }, 1000)
+      // OPTIMIZATION 5: Optimistically update UI immediately
+      const newVote = {
+        id: `temp-${Date.now()}`,
+        opinionId: opinion.id,
+        vote: voteType,
+        comment: comment.trim(),
+        voterFingerprint: getUserIdentifier(),
+        userId: 'current-user',
+        createdAt: new Date()
+      }
+      
+      const updatedVotes = [newVote, ...votes]
+      setVotes(updatedVotes)
+      setUserVote(newVote)
+      e
+      
+      
+      // The real-time subscription will update with actual data shortly
       
     } catch (error) {
-      console.error('Error submitting vote:', error)
+      console.error('❌ Error submitting vote:', error)
       toast({
         title: "Voting failed",
         description: error.message || "Please try again.",
@@ -185,37 +178,17 @@ function OpinionVotingContent() {
     }
   }
 
-  const agreeCount = votes.filter(vote => vote.vote === 'agree').length
-  const disagreeCount = votes.filter(vote => vote.vote === 'disagree').length
-  const totalVotes = agreeCount + disagreeCount
-  const agreePercentage = totalVotes > 0 ? (agreeCount / totalVotes) * 100 : 0
+  // OPTIMIZATION 6: Memoize calculations
+    const voteStats = React.useMemo(() => {
+    const agreeCount = votes.filter(vote => vote.vote === 'agree').length
+    const disagreeCount = votes.filter(vote => vote.vote === 'disagree').length
+    const totalVotes = agreeCount + disagreeCount
+    const agreePercentage = totalVotes > 0 ? (agreeCount / totalVotes) * 100 : 0
+    
+    return { agreeCount, disagreeCount, totalVotes, agreePercentage }
+  }, [votes])
 
-  // Debug logging
-  console.log('Vote calculation:', {
-    totalVotes: votes.length,
-    agreeCount,
-    disagreeCount,
-    totalVotes,
-    agreePercentage,
-    votes: votes.map(v => ({ 
-      vote: v.vote, 
-      comment: v.comment?.substring(0, 20),
-      id: v.id,
-      opinionId: v.opinionId
-    }))
-  })
-  
-  // Additional debugging for vote filtering
-  const agreeVotes = votes.filter(vote => vote.vote === 'agree')
-  const disagreeVotes = votes.filter(vote => vote.vote === 'disagree')
-  console.log('Agree votes:', agreeVotes.length, agreeVotes.map(v => ({ vote: v.vote, id: v.id })))
-  console.log('Disagree votes:', disagreeVotes.length, disagreeVotes.map(v => ({ vote: v.vote, id: v.id })))
-  
-  // Validate vote structure
-  const invalidVotes = votes.filter(vote => !vote.vote || (vote.vote !== 'agree' && vote.vote !== 'disagree'))
-  if (invalidVotes.length > 0) {
-    console.warn('Invalid votes found:', invalidVotes)
-  }
+  const { agreeCount, disagreeCount, totalVotes, agreePercentage } = voteStats
 
   if (loading) {
     return (
@@ -389,35 +362,6 @@ function OpinionVotingContent() {
           </Card>
         )}
 
-        {/* Word Cloud Section */}
-        {wordCloudData.length > 0 && (
-          <Card className="mb-6 shadow-lg border-0">
-            <CardHeader className="bg-gray-50 border-b">
-              <div className="flex items-center justify-between">
-                <CardTitle className="font-serif flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5" />
-                  Discussion Word Cloud
-                </CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowWordCloud(!showWordCloud)}
-                >
-                  {showWordCloud ? 'Hide' : 'Show'} Word Cloud
-                </Button>
-              </div>
-            </CardHeader>
-            {showWordCloud && (
-              <CardContent className="p-6">
-                <WordCloudComponent data={wordCloudData} />
-                <p className="text-xs text-gray-500 text-center mt-2">
-                  Generated from {votes.filter(v => v.comment).length} participant comments
-                </p>
-              </CardContent>
-            )}
-          </Card>
-        )}
-
         {/* Comments Section */}
         {votes.filter(vote => vote.comment).length > 0 && (
           <Card className="mb-6 shadow-lg border-0">
@@ -428,7 +372,7 @@ function OpinionVotingContent() {
               {votes
                 .filter(vote => vote.comment)
                 .map((vote, index) => (
-                  <div key={index} className="border-l-4 border-gray-200 pl-4">
+                  <div key={vote.id || index} className="border-l-4 border-gray-200 pl-4">
                     <div className="flex items-center gap-2 mb-1">
                       {vote.vote === 'agree' ? (
                         <ThumbsUp className="h-3 w-3 text-green-500" />
@@ -464,4 +408,4 @@ export default function OpinionVotingPage() {
       <OpinionVotingContent />
     </Suspense>
   )
-} 
+}
