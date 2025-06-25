@@ -395,96 +395,95 @@ export default function OpinionGame() {
     setShouldSkip(true);
   }
 
-  // Updated to use new Cloud Function
-  const handleSubmit = async () => {
-    if (!selectedOption) {
-      toast({
-        title: "Please select an option",
-        description: "Choose whether you agree or disagree first.",
-        variant: "destructive",
-      });
-      return;
-    }
-  
-    setIsSubmitting(true);
-  
-    try {
-      const userId = getOrCreateUserId();
-      
-      if (!userId) {
-        throw new Error('Unable to generate user ID');
+const handleSubmit = async () => {
+  if (!selectedOption) {
+    toast({
+      title: "Please select an option",
+      description: "Choose whether you agree or disagree first.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    // DEBUG: Check auth state
+    console.log("🔍 Debug - Auth state:", auth.currentUser ? "LOGGED IN" : "NOT LOGGED IN");
+    console.log("🔍 Debug - Current user UID:", auth.currentUser?.uid);
+    console.log("🔍 Debug - Current user email:", auth.currentUser?.email);
+    
+    // Prepare headers
+    const headers: any = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add auth token if user is signed in
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      try {
+        const token = await currentUser.getIdToken();
+        headers['Authorization'] = `Bearer ${token}`;
+        console.log("🔑 Auth token added to headers");
+        console.log("🔑 Token starts with:", token.substring(0, 20) + "...");
+      } catch (tokenError) {
+        console.log("⚠️ Could not get auth token:", tokenError);
       }
-  
-      const finalReasoning = reasoning.trim() || " ";
-      const today = new Date().toISOString().split("T")[0];
-      
-      const OpinionResponseData: OpinionResponse = {
-        userId: userId,
+    } else {
+      console.log("👥 No authenticated user, sending as guest");
+    }
+
+    console.log("📤 Final headers:", headers);
+    
+    const finalReasoning = reasoning.trim() || " ";
+    const today = new Date().toISOString().split("T")[0];
+    
+    console.log("📤 Submitting response with headers:", headers);
+    
+    // Use the new Cloud Function with proper auth
+    const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/submitResponse', {
+      method: 'POST',
+      headers, // Now includes Authorization header when available
+      body: JSON.stringify({
         opinionId: today,
         stance: selectedOption,
         reasoning: finalReasoning,
-        timestamp: new Date().toISOString(),
-        characterCount: reasoning.trim().length
-      };
-      
-      console.log("Submitting OpinionResponseData:", OpinionResponseData);
-      
-      // Use the new Cloud Function
-      const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/submitResponse', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(OpinionResponseData),
-      });
-  
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      const result = await response.json();
-      console.log("Server response:", result);
-      
-      if (result.success) {
-        console.log("Response submitted successfully!");
-        setHasSubmitted(true);
-        await loadStats();
-        
-        toast({
-          title: "Opinion submitted!",
-          description: "Thank you for sharing your thoughts.",
-        });
-      } else {
-        throw new Error(result.error || 'Submission failed');
-      }
-  
-    } catch (error) {
-      console.error("Error submitting response:", error);
-      toast({
-        title: "Submission failed",
-        description: error instanceof Error ? error.message : "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  const currentDate = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
+        // REMOVED: Don't send userId in body - server determines it from auth token
+      }),
+    });
 
-  const loadStats = async () => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const opinionStats = await getOpinionStats(today);
-      setStats(opinionStats);
-    } catch (error) {
-      console.error("Error loading stats:", error);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  };
+
+    const result = await response.json();
+    console.log("Server response:", result);
+    
+    if (result.success) {
+      console.log(`✅ Response submitted successfully as ${result.userType} user`);
+      setHasSubmitted(true);
+      await loadStats();
+      
+      toast({
+        title: "Opinion submitted!",
+        description: "Thank you for sharing your thoughts.",
+      });
+    } else {
+      throw new Error(result.error || 'Submission failed');
+    }
+
+  } catch (error) {
+    console.error("Error submitting response:", error);
+    toast({
+      title: "Submission failed",
+      description: error instanceof Error ? error.message : "Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+  
   const handleFeedback = async() => {
     try {
       const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
@@ -520,10 +519,23 @@ export default function OpinionGame() {
       });
     }
   }
+  const loadStats = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const opinionStats = await getOpinionStats(today);
+      setStats(opinionStats);
+    } catch (error) {
+      console.error("Error loading stats:", error);
+    }
+  }, []); // Empty dependency array since this function doesn't depend on any props/state
+  
 
-  const handleAnimationComplete = () => {
-    setIsAnimationComplete(true)
-  }
+  const handleAnimationComplete = useCallback(() => {
+    // Delay the state update to avoid updating during render
+    setTimeout(() => {
+      setIsAnimationComplete(true);
+    }, 0);
+  }, []);
 
   useEffect(() => {
     if (isAnimationComplete) {
@@ -765,6 +777,12 @@ useEffect(() => {
       })
     })
   }
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">

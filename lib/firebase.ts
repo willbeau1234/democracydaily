@@ -89,6 +89,10 @@ export async function submitResponse(
   userId?: string
 ): Promise<boolean> {
   try {
+    console.log("🔍 Debug - Auth state:", auth.currentUser ? "LOGGED IN" : "NOT LOGGED IN");
+    console.log("🔍 Debug - Current user UID:", auth.currentUser?.uid);
+    console.log("🔍 Debug - Current user email:", auth.currentUser?.email);
+
     // Prepare headers
     const headers: any = {
       'Content-Type': 'application/json',
