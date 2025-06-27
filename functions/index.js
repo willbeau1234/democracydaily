@@ -420,20 +420,26 @@ async function updateOpinionStats(opinionId) {
 }
 
 exports.midnightReset = functions.scheduler.onSchedule({
-  schedule: "0 0 * * *",
-  timeZone: "America/Chicago",
+  schedule: "0 6 * * *",  // 6 AM UTC = Midnight Chicago (CDT)
+  timeZone: "UTC",
 }, async (context) => {
   try {
-    const chicagoTime = new Date().toLocaleString("en-US", {timeZone: "America/Chicago"});
-    const today = new Date(chicagoTime).toISOString().split("T")[0];
+    const now = new Date();
+    const chicagoTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
+
+    const today = new Date(chicagoTime);
+    today.setHours(0, 0, 0, 0);
+
     const yesterday = new Date(chicagoTime);
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-    // Deactivate yesterday's opinion
+    yesterday.setHours(0, 0, 0, 0);
+
     const opinionsRef = db.collection("dailyOpinions");
     const yesterdayOpinionsQuery = opinionsRef.where("isActive", "==", true);
     const yesterdaySnapshot = await yesterdayOpinionsQuery.get();
 
+
+    
     const batch = db.batch();
     yesterdaySnapshot.forEach((doc) => {
       batch.update(doc.ref, {
@@ -445,8 +451,9 @@ exports.midnightReset = functions.scheduler.onSchedule({
     // Archive yesterday's responses
     const responsesRef = db.collection("responses");
     const yesterdayResponses = await responsesRef
-        .where("opinionId", "==", yesterdayStr)
-        .get();
+      .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(yesterday))
+      .where("timestamp", "<", admin.firestore.Timestamp.fromDate(today))
+      .get();
 
     const archiveRef = db.collection("archivedResponses");
     yesterdayResponses.forEach((doc) => {
@@ -555,7 +562,9 @@ exports.handlefeedback = functions.https.onRequest(async (req, res) => {
  */
 async function activateNextOpinion() {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const chicagoTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
+    const today = chicagoTime.toISOString().split("T")[0];
     console.log(`Looking for opinion to activate for: ${today}`);
 
     // Look for an opinion scheduled for today that isn't active yet
@@ -1040,14 +1049,18 @@ function calculateStreakFromDates(participationDates) {
   if (!participationDates || participationDates.length === 0) {
     return 0;
   }
-  
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const chicagoTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
+  const today = chicagoTime.toISOString().split('T')[0];
   const sortedDates = participationDates.slice().sort().reverse(); // Most recent first
   
   // Check if user participated today or yesterday to have an active streak
-  const hasRecentParticipation = sortedDates[0] === today || 
-    sortedDates[0] === new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0];
-  
+  const yesterday = new Date(chicagoTime);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  const hasRecentParticipation = sortedDates[0] === today || sortedDates[0] === yesterdayStr;
+    
   if (!hasRecentParticipation) {
     return 0;
   }
@@ -1066,6 +1079,5 @@ function calculateStreakFromDates(participationDates) {
       break;
     }
   }
-  
   return streak;
 }
