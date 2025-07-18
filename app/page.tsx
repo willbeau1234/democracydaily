@@ -24,6 +24,7 @@ import { auth } from '@/lib/firebase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AuthUser , OpinionResponse } from '@/lib/types';
+import AIvsHumanButton from '@/components/AIvsHumanButton';
 
 
 
@@ -1067,12 +1068,19 @@ useEffect(() => {
         )}
 
         {/* Typewriter Animation */}
+        {!hasSubmitted && (
         <div className="bg-white border rounded-lg shadow-lg mt-6 p-6">
           <div className="text-center">
             <h3 className="font-serif text-xl font-bold mb-4">New feature coming soon!</h3>
             <TypewriterAnimation />
           </div>
         </div>
+        )}
+        {hasSubmitted && (
+            <div className="bg-white border rounded-lg shadow-lg mt-6 p-6">
+              <AIvsHumanButton />
+            </div>
+          )}
       </div>
 
         {/* Enhanced Footer */}
