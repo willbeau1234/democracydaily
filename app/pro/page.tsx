@@ -42,7 +42,7 @@ function OpinionCalendar({ userId }: { userId: string }) {
       const q = query(responsesRef, where('userId', '==', anonUserId));
       const querySnapshot = await getDocs(q);
       
-      const userResponses: OpinionResponse[] = [];
+      const userResponses: (OpinionResponse & { id: string })[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data() as OpinionResponse;
         userResponses.push({ ...data, id: doc.id });
@@ -178,16 +178,46 @@ function OpinionCalendar({ userId }: { userId: string }) {
     return days;
   };
 
+  // Group days into weeks (starting from Sunday)
+  const groupIntoWeeks = () => {
+    const weeks: any[][] = [];
+
+    if (calendarData.length === 0) return weeks;
+
+    const firstDay = calendarData[0];
+    const startDayOfWeek = firstDay.date.getDay();
+
+    let currentWeek = new Array(startDayOfWeek).fill(null);
+
+    calendarData.forEach((day) => {
+      if (currentWeek.length === 7) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+      }
+      currentWeek.push(day);
+    });
+
+    // Fill the last week if needed
+    while (currentWeek.length < 7 && currentWeek.length > 0) {
+      currentWeek.push(null);
+    }
+    if (currentWeek.length > 0) {
+      weeks.push(currentWeek);
+    }
+
+    return weeks;
+  };
+
   // Helper function to get month labels for the calendar
   const getMonthLabels = () => {
     if (calendarData.length === 0) return [];
-    
-    const monthLabels = [];
+
+    const monthLabels: { month: any; weekIndex: number; }[] = [];
     let currentMonth = -1;
     let weekIndex = 0;
-    
+
     // Group calendar data into weeks first
-    const weeks = groupIntoWeeks();
+    const weekData = groupIntoWeeks();
   
   // Helper function to get month labels
   const getCalendarMonthLabels = () => {
@@ -246,7 +276,7 @@ function OpinionCalendar({ userId }: { userId: string }) {
   
   // Helper function to get month labels
   const getCalendarMonthLabels = () => {
-    const monthLabels = [];
+    const monthLabels: { month: any; weekIndex: number; }[] = [];
     let currentMonth = -1;
     
     weeks.forEach((week, index) => {
@@ -266,38 +296,7 @@ function OpinionCalendar({ userId }: { userId: string }) {
     return monthLabels;
   };
   const monthLabels = getMonthLabels();
-  
-  // Group days into weeks (starting from Sunday)
-  const groupIntoWeeks = () => {
-    const weeks: any[][] = [];
-    
-    if (calendarData.length === 0) return weeks;
-    
-    const firstDay = calendarData[0];
-    const startDayOfWeek = firstDay.date.getDay();
-    
-    let currentWeek = new Array(startDayOfWeek).fill(null);
-    
-    calendarData.forEach((day) => {
-      currentWeek.push(day);
-      
-      if (currentWeek.length === 7) {
-        weeks.push(currentWeek);
-        currentWeek = [];
-      }
-    });
-    
-    while (currentWeek.length < 7 && currentWeek.length > 0) {
-      currentWeek.push(null);
-    }
-    if (currentWeek.length > 0) {
-      weeks.push(currentWeek);
-    }
-    
-    return weeks;
-  };
-
-  const weeks = groupIntoWeeks();
+  const weeksData = groupIntoWeeks();
   
   // Transpose for GitHub-style display
   const transposeForDisplay = () => {
