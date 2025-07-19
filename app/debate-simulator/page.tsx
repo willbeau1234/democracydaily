@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -113,7 +113,8 @@ const extractScore = (text: string, pattern: RegExp): number | null => {
   return null
 }
 
-export default function VirtualDebateSimulation() {
+// Separate component that uses useSearchParams
+function VirtualDebateSimulationContent() {
   const searchParams = useSearchParams()
   
   // Get debate data from URL parameters
@@ -417,7 +418,7 @@ Then provide detailed feedback explaining your decision, highlighting the strong
                   New Debate
                 </Button>
               </div>
-            </div>            </div>
+            </div>
 
             <div className="space-y-2">
               <div className="flex justify-between text-xs sm:text-sm text-gray-600">
@@ -673,5 +674,25 @@ Then provide detailed feedback explaining your decision, highlighting the strong
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Main component with Suspense wrapper
+export default function VirtualDebateSimulation() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center p-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading Debate...</h2>
+            <p className="text-sm text-gray-600">Preparing your virtual debate experience</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <VirtualDebateSimulationContent />
+    </Suspense>
   )
 }
