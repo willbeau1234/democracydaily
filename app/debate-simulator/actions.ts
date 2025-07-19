@@ -1,4 +1,4 @@
-"use server"
+"use client"
 
 import { geminiModel } from '@/lib/firebase';  // Using your existing setup
 
