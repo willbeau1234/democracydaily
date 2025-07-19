@@ -10,6 +10,7 @@ import {
   getDocs, 
   addDoc, 
   orderBy,
+  onSnapshot,
   Timestamp 
 } from 'firebase/firestore'
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth"
@@ -609,6 +610,72 @@ const isYesterday = (dateString: string): boolean => {
 // Check if a date is today
 const isToday = (dateString: string): boolean => {
   return dateString === getTodayDate()
+}
+// Listen to votes in real-time for DIY opinions
+export const subscribeToVotes = (
+  opinionId: string, 
+  callback: (votes: DIYVote[]) => void
+): (() => void) => {
+  const q = query(
+    collection(db, 'diy_votes'), 
+    where('opinionId', '==', opinionId),
+    orderBy('createdAt', 'desc')
+  )
+  
+  return onSnapshot(q, (querySnapshot) => {
+    const votes = querySnapshot.docs.map(doc => doc.data() as DIYVote)
+    callback(votes)
+  })
+}
+
+// Get user streak
+export const getUserStreak = (): UserStreak => {
+  if (typeof window === 'undefined') {
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
+      lastParticipationDate: '',
+      totalParticipations: 0,
+      participationDates: []
+    }
+  }
+
+  const streakData = localStorage.getItem('userStreak')
+  if (!streakData) {
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
+      lastParticipationDate: '',
+      totalParticipations: 0,
+      participationDates: []
+    }
+  }
+
+  const streak: UserStreak = JSON.parse(streakData)
+  return streak
+}
+
+// Record user participation for streak tracking
+export const recordUserParticipation = () => {
+  if (typeof window === 'undefined') return
+  
+  const today = getTodayDate()
+  const currentStreak = getUserStreak()
+  
+  // Don't record if already participated today
+  if (currentStreak.participationDates.includes(today)) {
+    return
+  }
+  
+  const updatedStreak: UserStreak = {
+    currentStreak: currentStreak.currentStreak + 1,
+    longestStreak: Math.max(currentStreak.longestStreak, currentStreak.currentStreak + 1),
+    lastParticipationDate: today,
+    totalParticipations: currentStreak.totalParticipations + 1,
+    participationDates: [...currentStreak.participationDates, today]
+  }
+  
+  localStorage.setItem('userStreak', JSON.stringify(updatedStreak))
 }
 
 export { model as geminiModel }
