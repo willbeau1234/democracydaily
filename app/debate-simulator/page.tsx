@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Clock, Users, Trophy, MessageSquare, Send } from "lucide-react"
-import { generateDebateResponse } from "./actions"
+import { generateDebateResponse } from "./actions"  // ← Removed Server Action import
 
 
 type Persona = "pro" | "con" | "moderator" | "judge"
@@ -183,7 +183,10 @@ export default function VirtualDebateSimulation() {
     addMessage("moderator", moderatorIntro, "opening")
     setCurrentSpeaker("pro") // User always starts since they're defending their opinion
     setWaitingForUser(true)
-    setUserPrompt(`Defend and elaborate on your opinion. Explain your reasoning in detail and provide supporting evidence and examples. You have 3 minutes to make your case.`)
+    
+    // Pre-fill the user's input with their original reasoning
+    setUserInput(stance)
+    setUserPrompt(`Here's your original reasoning (feel free to edit and expand): "${stance}". Elaborate on your opinion, explain your reasoning in more detail, and provide supporting evidence and examples. You have 3 minutes to make your case.`)
     setIsGenerating(false)
   }
 
@@ -221,9 +224,9 @@ export default function VirtualDebateSimulation() {
 
     // Generate AI response if not waiting for user
     if (nextSpeaker !== "pro") {
-      const updatedMessages = [...messages, {
+      const updatedMessages: DebateMessage[] = [...messages, {
         id: Date.now().toString(),
-        persona: "pro",
+        persona: "pro" as Persona,  // Explicit type assertion
         content: userMessage,
         timestamp: new Date(),
         phase: currentPhase

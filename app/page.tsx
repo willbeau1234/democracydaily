@@ -14,7 +14,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from "uuid";
-import { getTodayOpinion, getOpinionStats, OpinionStats, useRealTimeStats, useRealTimeWordCloud, getUserResponse } from "@/lib/firebase";
+import { getTodayOpinion, getOpinionStats, OpinionStats, getUserResponse } from "@/lib/firebase";
 import { collection, addDoc } from 'firebase/firestore';
 import { query, where, getDocs } from 'firebase/firestore';
 import TypewriterAnimation from '@/components/TypewriterAnimation';
@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AuthUser , OpinionResponse } from '@/lib/types';
 import AIvsHumanButton from '@/components/AIvsHumanButton';
+import { useRealTimeStats, useRealTimeWordCloud, useRealTimeVotes } from '@/hooks/useFirebase'
 
 
 

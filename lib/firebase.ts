@@ -9,16 +9,14 @@ import {
   where, 
   getDocs, 
   addDoc, 
-  onSnapshot, 
   orderBy,
   Timestamp 
 } from 'firebase/firestore'
-import { useState, useEffect } from 'react'
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { v4 as uuidv4 } from 'uuid'
 import { getPerformance } from 'firebase/performance'; 
-import { getAI, getGenerativeModel } from 'firebase/ai';
+import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase/ai';
 
 //  web app's Firebase configuration
 const firebaseConfig = {
@@ -30,18 +28,22 @@ const firebaseConfig = {
   appId: "1:208931717554:web:18e6f049b2622886d5a4ab",
   measurementId: "G-R1ZJFEYTBZ"
  };
- 
- 
+
+// Initialize FirebaseApp
+const firebaseApp = initializeApp(firebaseConfig);
+
+// Initialize the Gemini Developer API backend service
+const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
+
+// Create a `GenerativeModel` instance with a model that supports your use case
+const model = getGenerativeModel(ai, { model: "gemini-2.5-flash" });
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
 const storage = getStorage(app)
-export const vertexAI = getAI(app); // <-- EXPORTED!
-export const geminiModel = getGenerativeModel(vertexAI, { model: 'gemini-pro' }); // <-- EXPORTED!
 export const perf = typeof window !== 'undefined' ? getPerformance(app) : null;
 export { db }
-
 
 // EXISTING INTERFACES AND FUNCTIONS
 export interface Opinion {
@@ -179,116 +181,6 @@ export async function getOpinionStats(opinionId: string): Promise<OpinionStats> 
     agreePercentage,
     disagreePercentage: 100 - agreePercentage
   }
-}
-
-export function useRealTimeStats(opinionId: string) {
-  const [stats, setStats] = useState<OpinionStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  
-  useEffect(() => {
-    if (!opinionId) return
-
-    const q = query(
-      collection(db, "responses"),
-      where("opinionId", "==", opinionId)
-    )
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let agreeCount = 0
-      let disagreeCount = 0
-
-      snapshot.forEach((doc) => {
-        const data = doc.data()
-        if (data.stance === "agree") agreeCount++
-        else if (data.stance === "disagree") disagreeCount++
-      })
-
-      const totalResponses = agreeCount + disagreeCount
-      const agreePercentage = totalResponses > 0 ? Math.round((agreeCount / totalResponses) * 100) : 0
-      
-      setStats({
-        agreeCount,
-        disagreeCount,
-        totalResponses,
-        agreePercentage,
-        disagreePercentage: 100 - agreePercentage,
-      })
-      setLoading(false)
-    })
-
-    return () => unsubscribe()
-  }, [opinionId])
-
-  return { stats, loading }
-}
-
-export function useRealTimeWordCloud(opinionId: string, stance: 'agree' | 'disagree') {
-  const [wordData, setWordData] = useState<[string, number][]>([])
-  const [loading, setLoading] = useState(true)
-  const [responseCount, setResponseCount] = useState(0)
-
-  const processText = (text: string): [string, number][] => {
-    if (!text || text.trim().length === 0) return []
-
-    const stopwords = new Set([
-      'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'him', 'his',
-      'she', 'her', 'it', 'its', 'they', 'them', 'their', 'this', 'that',
-      'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been',
-      'being', 'have', 'has', 'had', 'do', 'does', 'did', 'a', 'an',
-      'the', 'and', 'but', 'if', 'or', 'because', 'as', 'of', 'at', 'by',
-      'for', 'with', 'in', 'on', 'to', 'from', 'will', 'would', 'could',
-      'should', 'can', 'may', 'might', 'must', 'about', 'up', 'down',
-      'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once',
-      'really', 'need', 'feel', 'believe', 'think', 'know', 'get', 'like',
-      'also', 'just', 'now', 'well', 'way', 'make', 'take', 'come', 'go'
-    ])
-
-    const words = text.toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .split(/\s+/)
-      .filter(word => word.length > 2 && !stopwords.has(word))
-
-    const wordCount: { [key: string]: number } = {}
-    words.forEach(word => {
-      wordCount[word] = (wordCount[word] || 0) + 1
-    })
-
-    return Object.entries(wordCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 60) as [string, number][]
-  }
-
-  useEffect(() => {
-    if (!opinionId || !stance) return
-
-    const q = query(
-      collection(db, "responses"),
-      where("opinionId", "==", opinionId),
-      where("stance", "==", stance),
-      orderBy("timestamp", "desc")
-    )
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const responses: string[] = []
-      snapshot.forEach((doc) => {
-        const data = doc.data()
-        if (data.reasoning) {
-          responses.push(data.reasoning)
-        }
-      })
-
-      const combinedText = responses.join(' ')
-      const wordFrequencies = processText(combinedText)
-      
-      setWordData(wordFrequencies)
-      setResponseCount(responses.length)
-      setLoading(false)
-    })
-
-    return () => unsubscribe()
-  }, [opinionId, stance])
-
-  return { wordData, loading, responseCount }
 }
 
 export interface SeparatedReasoning {
@@ -473,6 +365,7 @@ export const getOpinionByToken = async (token: string): Promise<DIYOpinion | nul
     throw error
   }
 }
+
 // Submit a vote on DIY opinion
 export const submitVote = async (opinionId: string, voteData: DIYVoteData): Promise<DIYVote> => {
   try {
@@ -561,25 +454,10 @@ export const getVotesForOpinion = async (opinionId: string): Promise<DIYVote[]> 
   }
 }
 
-// Listen to votes in real-time for DIY opinions
-export const subscribeToVotes = (
-  opinionId: string, 
-  callback: (votes: DIYVote[]) => void
-): (() => void) => {
-  const q = query(
-    collection(db, 'diy_votes'), 
-    where('opinionId', '==', opinionId),
-    orderBy('createdAt', 'desc')
-  )
-  
-  return onSnapshot(q, (querySnapshot) => {
-    const votes = querySnapshot.docs.map(doc => doc.data() as DIYVote)
-    callback(votes)
-  })
-}
-
 // Generate anonymous voter fingerprint
 const getOrCreateVoterFingerprint = (): string => {
+  if (typeof window === 'undefined') return ''
+  
   let fingerprint = localStorage.getItem('voterFingerprint')
   if (!fingerprint) {
     fingerprint = uuidv4()
@@ -590,6 +468,8 @@ const getOrCreateVoterFingerprint = (): string => {
 
 // Generate anonymous user ID (consistent across all features)
 const getOrCreateUserId = (): string => {
+  if (typeof window === 'undefined') return ''
+  
   let userId = localStorage.getItem('anonUserId')
   if (!userId) {
     userId = uuidv4()
@@ -657,6 +537,16 @@ export interface UserProfile {
 export const createOrGetUserProfile = async (name: string, email?: string): Promise<UserProfile> => {
   const userId = getOrCreateUserId()
   
+  if (typeof window === 'undefined') {
+    return {
+      id: userId,
+      name,
+      email,
+      createdAt: new Date(),
+      lastActive: new Date()
+    }
+  }
+  
   // Store user profile in localStorage for now
   // In a real app, you'd store this in Firestore
   const profile: UserProfile = {
@@ -673,12 +563,16 @@ export const createOrGetUserProfile = async (name: string, email?: string): Prom
 
 // Get current user profile
 export const getCurrentUserProfile = (): UserProfile | null => {
+  if (typeof window === 'undefined') return null
+  
   const profile = localStorage.getItem('userProfile')
   return profile ? JSON.parse(profile) : null
 }
 
 // Update user activity
 export const updateUserActivity = () => {
+  if (typeof window === 'undefined') return
+  
   const profile = getCurrentUserProfile()
   if (profile) {
     profile.lastActive = new Date()
@@ -717,4 +611,4 @@ const isToday = (dateString: string): boolean => {
   return dateString === getTodayDate()
 }
 
-// Calculate streak from participation dates
+export { model as geminiModel }
