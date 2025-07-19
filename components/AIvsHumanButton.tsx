@@ -3,7 +3,12 @@
 import { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 
-const AIvsHumanButton = () => {
+interface AIvsHumanButtonProps {
+  personOpinion?: string;
+  opinionOfTheDay?: string;
+}
+
+const AIvsHumanButton = ({ personOpinion, opinionOfTheDay }: AIvsHumanButtonProps) => {
   const [isAnimating, setIsAnimating] = useState(false)
   const [battlePhase, setBattlePhase] = useState(0)
   const [clickCount, setClickCount] = useState(0)
@@ -29,7 +34,6 @@ const AIvsHumanButton = () => {
 
   const handleClick = () => {
     setClickCount(prev => prev + 1)
-    setIsAnimating(!isAnimating)
     
     // Add some fun responses
     if (clickCount === 0) {
@@ -37,6 +41,22 @@ const AIvsHumanButton = () => {
     } else if (clickCount === 3) {
       console.log("🎉 You've started an epic debate!")
     }
+    
+    // After a short delay to show the click animation, navigate to debate simulator
+    setTimeout(() => {
+      // Encode the opinions as URL parameters
+      const params = new URLSearchParams({
+        personOpinion: personOpinion || '',
+        opinionOfTheDay: opinionOfTheDay || ''
+      })
+      
+      // Navigate to debate simulator with the opinions
+      // You can replace this with your preferred navigation method
+      // For React Router: navigate(`/debate-simulator?${params}`)
+      // For Next.js: router.push(`/debate-simulator?${params}`)
+      // For now using window.location:
+      window.location.href = `/debate-simulator?${params}`
+    }, 500) // 500ms delay to show the click effect
   }
 
   const getBattleEmoji = () => {
@@ -113,11 +133,11 @@ const AIvsHumanButton = () => {
       <div className="text-center">
         {!isAnimating ? (
           <p className="text-sm text-gray-500 font-serif italic">
-            Click to start the epic debate simulation!
+            Click to start the epic debate with your opinion!
           </p>
         ) : (
           <p className="text-sm text-gray-700 font-serif font-semibold animate-pulse">
-            🚀 AI vs Human debate simulation loading...
+            🚀 Loading AI vs Human debate arena...
           </p>
         )}
       </div>

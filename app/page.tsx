@@ -1078,7 +1078,10 @@ useEffect(() => {
         )}
         {hasSubmitted && (
             <div className="bg-white border rounded-lg shadow-lg mt-6 p-6">
-              <AIvsHumanButton />
+              <AIvsHumanButton 
+                personOpinion={reasoning} 
+                opinionOfTheDay={opinionPiece} 
+              />
             </div>
           )}
       </div>
