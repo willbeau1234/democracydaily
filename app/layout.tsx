@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'The Democracy Daily',
   description: 'Where Your Voice Matters - Daily civic engagement through opinion discussions',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/favicon.png',
   },
 }
 
