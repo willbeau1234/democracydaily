@@ -4,6 +4,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'The Democracy Daily',
   description: 'Where Your Voice Matters - Daily civic engagement through opinion discussions',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export const viewport: Viewport = {
