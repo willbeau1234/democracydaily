@@ -1468,6 +1468,7 @@ exports.getFriends = functions.https.onRequest({
           const userData = userDoc.data();
           friends.push({
             uid: friendId,
+            userId: friendId,
             displayName: userData.displayName,
             email: userData.email,
             photoURL: userData.photoURL,
@@ -1526,12 +1527,22 @@ exports.getFriendsOpinions = functions.https.onRequest({
 
     // Get current active opinion if not specified
     let targetOpinionId = opinionId;
+    let activeOpinionData = null;
     if (!targetOpinionId) {
       const activeOpinionQuery = db.collection("dailyOpinions").where("isActive", "==", true).limit(1);
       const activeSnapshot = await activeOpinionQuery.get();
       if (!activeSnapshot.empty) {
-        // Use publishAt field (date string) instead of document ID
-        targetOpinionId = activeSnapshot.docs[0].data().publishAt;
+        // Use publishAt date to match with responses collection opinionId field
+        activeOpinionData = activeSnapshot.docs[0].data();
+        targetOpinionId = activeOpinionData.publishAt;
+        
+        // Also try today's date if publishAt doesn't match
+        const chicagoTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}));
+        const todayDate = chicagoTime.toISOString().split('T')[0];
+        
+        console.log("🔍 DEBUG: Active opinion publishAt:", activeOpinionData.publishAt);
+        console.log("🔍 DEBUG: Today's date (Chicago):", todayDate);
+        console.log("🔍 DEBUG: Using targetOpinionId:", targetOpinionId);
       } else {
         res.json({
           success: true,
@@ -1571,36 +1582,85 @@ exports.getFriendsOpinions = functions.https.onRequest({
     const responsesRef = db.collection("responses");
     const friendsOpinions = [];
 
+    console.log("🔍 DEBUG: Looking for opinions with targetOpinionId:", targetOpinionId);
+    console.log("🔍 DEBUG: Friend user IDs:", friendUserIds);
+
+    // Create list of possible dates to check
+    const datesToCheck = [targetOpinionId];
+    if (activeOpinionData) {
+      const chicagoTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}));
+      const todayDate = chicagoTime.toISOString().split('T')[0];
+      if (todayDate !== targetOpinionId) {
+        datesToCheck.push(todayDate);
+      }
+    }
+    
+    console.log("🔍 DEBUG: Will check these dates for opinions:", datesToCheck);
+
     for (const friendId of friendUserIds) {
       try {
-        // Get friend's response
-        const responseQuery = responsesRef
-          .where("opinionId", "==", targetOpinionId)
-          .where("userId", "==", friendId)
-          .limit(1);
+        console.log("🔍 DEBUG: Querying for friendId:", friendId);
         
-        const responseSnapshot = await responseQuery.get();
+        let responseFound = false;
         
-        if (!responseSnapshot.empty) {
-          const responseDoc = responseSnapshot.docs[0];
-          const responseData = responseDoc.data();
+        // Try each possible date
+        for (const dateToCheck of datesToCheck) {
+          console.log("🔍 DEBUG: Trying date:", dateToCheck);
           
-          // Get friend's user details
-          const userDoc = await db.collection("users").doc(friendId).get();
-          const userData = userDoc.exists ? userDoc.data() : {};
+          const responseQuery = responsesRef
+            .where("opinionId", "==", dateToCheck)
+            .where("userId", "==", friendId)
+            .limit(1);
           
-          friendsOpinions.push({
-            id: responseDoc.id,
-            userId: friendId,
-            displayName: userData.displayName || "Unknown User",
-            email: userData.email,
-            photoURL: userData.photoURL,
-            stance: responseData.stance,
-            reasoning: responseData.reasoning,
-            timestamp: responseData.timestamp,
-            createdAt: responseData.createdAt
-          });
+          const responseSnapshot = await responseQuery.get();
+          
+          console.log(`🔍 DEBUG: Response for ${dateToCheck} empty?`, responseSnapshot.empty);
+          
+          if (!responseSnapshot.empty) {
+            const responseDoc = responseSnapshot.docs[0];
+            const responseData = responseDoc.data();
+            
+            console.log("✅ Found response for friend:", friendId, "on date:", dateToCheck);
+            
+            // Get friend's user details
+            const userDoc = await db.collection("users").doc(friendId).get();
+            const userData = userDoc.exists ? userDoc.data() : {};
+            
+            friendsOpinions.push({
+              id: responseDoc.id,
+              userId: friendId,
+              displayName: userData.displayName || "Unknown User",
+              email: userData.email,
+              photoURL: userData.photoURL,
+              stance: responseData.stance,
+              reasoning: responseData.reasoning,
+              timestamp: responseData.timestamp,
+              createdAt: responseData.createdAt,
+              matchedDate: dateToCheck
+            });
+            
+            responseFound = true;
+            break; // Found response, no need to check other dates
+          }
         }
+        
+        if (!responseFound) {
+          console.log("❌ No response found for friend:", friendId, "on any date");
+          
+          // Check what dates this friend has responses for (debugging)
+          const friendResponsesQuery = responsesRef
+            .where("userId", "==", friendId)
+            .orderBy("timestamp", "desc")
+            .limit(5);
+          
+          const friendResponsesSnapshot = await friendResponsesQuery.get();
+          const friendDates = [];
+          friendResponsesSnapshot.forEach(doc => {
+            friendDates.push(doc.data().opinionId);
+          });
+          console.log("🔍 DEBUG: Friend", friendId, "has responses for dates:", friendDates);
+        }
+        
       } catch (error) {
         console.warn("Could not fetch friend's opinion:", friendId, error);
       }

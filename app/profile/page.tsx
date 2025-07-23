@@ -49,6 +49,11 @@ interface Friend {
   createdAt: any;
   hasSubmittedToday: boolean;
   lastSubmissionDate?: string;
+  todayOpinion?: {
+    stance: 'agree' | 'disagree';
+    reasoning: string;
+    timestamp: any;
+  };
 }
 
 // Helper to get auth token
@@ -258,11 +263,13 @@ function FriendsManager({ userId }: { userId: string }) {
             
             // Check if friend has submitted today by looking for their response
             try {
-              // Ensure friend.userId exists before querying
-              if (!friend.userId) {
+              // Ensure friend has a valid userId (try multiple properties)
+              const friendUserId = friend.userId || friend.uid;
+              if (!friendUserId) {
                 console.warn('Friend missing userId:', friend);
                 return {
                   ...friend,
+                  userId: friend.uid || 'unknown',
                   hasSubmittedToday: false,
                   lastSubmissionDate: null
                 };
@@ -270,22 +277,30 @@ function FriendsManager({ userId }: { userId: string }) {
               
               const responseQuery = query(
                 collection(db, 'responses'),
-                where('userId', '==', friend.userId),
+                where('userId', '==', friendUserId),
                 where('opinionId', '==', today)
               );
               const responseSnapshot = await getDocs(responseQuery);
               const hasSubmittedToday = !responseSnapshot.empty;
               
               let lastSubmissionDate = null;
+              let todayOpinion = null;
               if (!responseSnapshot.empty) {
                 const response = responseSnapshot.docs[0].data();
                 lastSubmissionDate = response.opinionId;
+                todayOpinion = {
+                  stance: response.stance,
+                  reasoning: response.reasoning,
+                  timestamp: response.timestamp
+                };
               }
 
               return {
                 ...friend,
+                userId: friendUserId,
                 hasSubmittedToday,
-                lastSubmissionDate
+                lastSubmissionDate,
+                todayOpinion
               };
             } catch (error) {
               console.error('Error checking friend submission status:', error);
@@ -371,7 +386,7 @@ function FriendsManager({ userId }: { userId: string }) {
       ) : (
         <div className="space-y-4">
           {friends.map((friend) => (
-            <div key={friend.id || friend.userId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50">
+            <div key={friend.userId || friend.uid || `friend-${Math.random()}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50">
               <div className="flex items-center gap-3">
                 <Avatar className="w-12 h-12">
                   <AvatarImage src={friend.photoURL} alt={friend.displayName} />
@@ -386,17 +401,12 @@ function FriendsManager({ userId }: { userId: string }) {
                     {friend.hasSubmittedToday ? (
                       <span className="flex items-center gap-1 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
                         <Check className="w-3 h-3" />
-                        Submitted today
+                        Has submitted today
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full">
                         <X className="w-3 h-3" />
-                        No submission today
-                      </span>
-                    )}
-                    {friend.lastSubmissionDate && (
-                      <span className="text-xs text-gray-400">
-                        Last: {friend.lastSubmissionDate}
+                        Has not submitted today
                       </span>
                     )}
                   </div>
@@ -918,19 +928,26 @@ function OpinionCalendar({ authUserId }: { authUserId: string }) {
           
           <div className="flex-1">
             <div className="flex gap-2">
+              <label htmlFor="profile-photo-url" className="sr-only">
+                Profile photo URL
+              </label>
               <input
+                id="profile-photo-url"
+                name="profilePhotoURL"
                 type="url"
                 value={profilePhotoURL}
                 onChange={(e) => setProfilePhotoURL(e.target.value)}
                 placeholder="Paste photo URL (optional)"
                 className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 disabled={uploading}
+                aria-describedby="profile-photo-help"
               />
               <Button
                 onClick={handlePhotoURLChange}
                 disabled={uploading || !profilePhotoURL.trim()}
                 variant="outline"
                 size="sm"
+                aria-label="Save profile photo"
               >
                 {uploading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
@@ -939,7 +956,7 @@ function OpinionCalendar({ authUserId }: { authUserId: string }) {
                 )}
               </Button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p id="profile-photo-help" className="text-xs text-gray-500 mt-1">
               Add a profile photo if you'd like (completely optional)
             </p>
           </div>
