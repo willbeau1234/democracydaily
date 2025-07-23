@@ -1530,7 +1530,8 @@ exports.getFriendsOpinions = functions.https.onRequest({
       const activeOpinionQuery = db.collection("dailyOpinions").where("isActive", "==", true).limit(1);
       const activeSnapshot = await activeOpinionQuery.get();
       if (!activeSnapshot.empty) {
-        targetOpinionId = activeSnapshot.docs[0].id;
+        // Use publishAt field (date string) instead of document ID
+        targetOpinionId = activeSnapshot.docs[0].data().publishAt;
       } else {
         res.json({
           success: true,
@@ -1829,6 +1830,119 @@ exports.getPendingFriendRequests = functions.https.onRequest({
 
   } catch (error) {
     console.error("Error getting pending friend requests:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Check friendship status between current user and target user
+ */
+exports.checkFriendshipStatus = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUserId = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUserId = decodedToken.uid;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    const targetUserId = req.query.targetUserId;
+
+    if (!targetUserId) {
+      res.status(400).json({error: "Target user ID required"});
+      return;
+    }
+
+    if (currentUserId === targetUserId) {
+      res.json({
+        success: true,
+        status: 'self'
+      });
+      return;
+    }
+
+    // Check if they're already friends
+    const friendshipsRef = db.collection("friendships");
+    const friendshipQuery = friendshipsRef
+      .where("users", "array-contains", currentUserId);
+    
+    const friendshipSnapshot = await friendshipQuery.get();
+    const isFriends = friendshipSnapshot.docs.some(doc => {
+      const users = doc.data().users;
+      return users.includes(targetUserId);
+    });
+
+    if (isFriends) {
+      res.json({
+        success: true,
+        status: 'friends'
+      });
+      return;
+    }
+
+    // Check for pending friend requests
+    const friendRequestsRef = db.collection("friendRequests");
+    
+    // Check if current user sent a request to target user
+    const sentRequestQuery = friendRequestsRef
+      .where("senderId", "==", currentUserId)
+      .where("receiverId", "==", targetUserId)
+      .where("status", "==", "pending");
+    
+    const sentRequestSnapshot = await sentRequestQuery.get();
+    
+    if (!sentRequestSnapshot.empty) {
+      res.json({
+        success: true,
+        status: 'pending_sent'
+      });
+      return;
+    }
+
+    // Check if target user sent a request to current user
+    const receivedRequestQuery = friendRequestsRef
+      .where("senderId", "==", targetUserId)
+      .where("receiverId", "==", currentUserId)
+      .where("status", "==", "pending");
+    
+    const receivedRequestSnapshot = await receivedRequestQuery.get();
+    
+    if (!receivedRequestSnapshot.empty) {
+      res.json({
+        success: true,
+        status: 'pending_received'
+      });
+      return;
+    }
+
+    // No relationship found
+    res.json({
+      success: true,
+      status: 'none'
+    });
+
+  } catch (error) {
+    console.error("Error checking friendship status:", error);
     res.status(500).json({success: false, error: error.message});
   }
 });

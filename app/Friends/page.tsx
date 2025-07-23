@@ -36,6 +36,7 @@ interface SearchResult {
   email: string;
   photoURL?: string;
   createdAt: any;
+  friendshipStatus?: 'none' | 'pending_sent' | 'pending_received' | 'friends';
 }
 
 // Helper to get auth token
@@ -66,6 +67,7 @@ export default function FriendsOpinionApp() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [searching, setSearching] = useState(false)
   const [sendingRequest, setSendingRequest] = useState<string | null>(null)
+  const [friendshipStatuses, setFriendshipStatuses] = useState<Map<string, string>>(new Map())
   
   // Card swipe state
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -182,7 +184,11 @@ export default function FriendsOpinionApp() {
       
       const data = await response.json()
       if (data.success) {
-        setSearchResults(data.users || [])
+        const users = data.users || []
+        setSearchResults(users)
+        
+        // Check friendship status for each user
+        await checkFriendshipStatuses(users)
       } else {
         console.error('Search failed:', data.error)
       }
@@ -190,6 +196,38 @@ export default function FriendsOpinionApp() {
       console.error('Error searching users:', error)
     } finally {
       setSearching(false)
+    }
+  }
+
+  const checkFriendshipStatuses = async (users: SearchResult[]) => {
+    try {
+      const token = await getAuthToken()
+      if (!token) return
+
+      const statusMap = new Map<string, string>()
+      
+      for (const user of users) {
+        try {
+          const response = await fetch(`https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/checkFriendshipStatus?targetUserId=${user.uid}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          const data = await response.json()
+          if (data.success) {
+            statusMap.set(user.uid, data.status)
+          }
+        } catch (error) {
+          console.error(`Error checking friendship status for ${user.uid}:`, error)
+          statusMap.set(user.uid, 'none')
+        }
+      }
+      
+      setFriendshipStatuses(statusMap)
+    } catch (error) {
+      console.error('Error checking friendship statuses:', error)
     }
   }
 
@@ -216,8 +254,8 @@ export default function FriendsOpinionApp() {
       if (data.success) {
         console.log('✅ Friend request sent successfully')
         alert('Friend request sent!')
-        // Remove from search results
-        setSearchResults(prev => prev.filter(user => user.uid !== targetUserId))
+        // Update friendship status to pending_sent
+        setFriendshipStatuses(prev => new Map(prev.set(targetUserId, 'pending_sent')))
       } else {
         console.error('❌ Failed to send friend request:', data.error)
         alert(data.error || 'Failed to send friend request')
@@ -227,6 +265,51 @@ export default function FriendsOpinionApp() {
       alert('Error sending friend request')
     } finally {
       setSendingRequest(null)
+    }
+  }
+
+  const getButtonContent = (userId: string, displayName: string) => {
+    const status = friendshipStatuses.get(userId) || 'none'
+    const isLoading = sendingRequest === userId
+
+    if (isLoading) {
+      return {
+        icon: <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>,
+        text: '',
+        className: 'bg-gray-400 cursor-not-allowed',
+        disabled: true
+      }
+    }
+
+    switch (status) {
+      case 'friends':
+        return {
+          icon: <Check className="w-4 h-4" />,
+          text: 'Friends',
+          className: 'bg-green-600 hover:bg-green-700',
+          disabled: true
+        }
+      case 'pending_sent':
+        return {
+          icon: <Clock className="w-4 h-4" />,
+          text: 'Pending',
+          className: 'bg-yellow-600 hover:bg-yellow-700',
+          disabled: true
+        }
+      case 'pending_received':
+        return {
+          icon: <Check className="w-4 h-4" />,
+          text: 'Accept',
+          className: 'bg-blue-600 hover:bg-blue-700',
+          disabled: false
+        }
+      default:
+        return {
+          icon: <UserPlus className="w-4 h-4" />,
+          text: 'Add',
+          className: 'bg-purple-600 hover:bg-purple-700',
+          disabled: false
+        }
     }
   }
 
@@ -634,18 +717,20 @@ export default function FriendsOpinionApp() {
                       </div>
                     </div>
                     <button
-                      onClick={() => sendFriendRequest(result.uid)}
-                      disabled={sendingRequest === result.uid}
-                      className="flex items-center gap-1 px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                      onClick={() => {
+                        const status = friendshipStatuses.get(result.uid) || 'none'
+                        if (status === 'pending_received') {
+                          // Handle accepting friend request - would need to implement this
+                          alert('Please go to your profile to accept friend requests')
+                        } else if (status === 'none') {
+                          sendFriendRequest(result.uid)
+                        }
+                      }}
+                      disabled={getButtonContent(result.uid, result.displayName).disabled}
+                      className={`flex items-center gap-1 px-3 py-1 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm ${getButtonContent(result.uid, result.displayName).className}`}
                     >
-                      {sendingRequest === result.uid ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <>
-                          <UserPlus className="w-4 h-4" />
-                          Add
-                        </>
-                      )}
+                      {getButtonContent(result.uid, result.displayName).icon}
+                      {getButtonContent(result.uid, result.displayName).text}
                     </button>
                   </div>
                 ))}
