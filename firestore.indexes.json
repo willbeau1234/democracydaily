@@ -27,17 +27,7 @@
           "order": "DESCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "diy_opinions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "shareableToken",
-          "order": "ASCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": []
-} 
+}

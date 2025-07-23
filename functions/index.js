@@ -420,43 +420,61 @@ async function updateOpinionStats(opinionId) {
 }
 
 exports.midnightReset = functions.scheduler.onSchedule({
-  schedule: "0 6 * * *",  // 6 AM UTC = Midnight Chicago (CDT)
-  timeZone: "UTC",
+  schedule: "0 6 * * *",  // 6 AM UTC = Midnight Chicago time
+  timeZone: "America/Chicago",  // Use Chicago timezone directly
 }, async (context) => {
   try {
+    console.log("🕛 Starting midnight reset process...");
+    
+    // Get current Chicago time - should be exactly midnight
     const now = new Date();
-    const chicagoTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
-
-    const today = new Date(chicagoTime);
+    const today = new Date(now);
     today.setHours(0, 0, 0, 0);
 
-    const yesterday = new Date(chicagoTime);
+    const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     yesterday.setHours(0, 0, 0, 0);
 
-    const opinionsRef = db.collection("dailyOpinions");
-    const yesterdayOpinionsQuery = opinionsRef.where("isActive", "==", true);
-    const yesterdaySnapshot = await yesterdayOpinionsQuery.get();
+    console.log(`📅 Reset date: ${today.toISOString().split('T')[0]}`);
 
+    // Step 1: Activate today's opinion FIRST to prevent gaps
+    console.log("🔄 Activating today's opinion...");
+    const activationResult = await activateNextOpinion();
+    console.log("✅ Opinion activation result:", activationResult);
 
+    // Step 2: Deactivate and archive in single atomic operation
+    console.log("🗂️ Deactivating previous opinions and archiving responses...");
     
     const batch = db.batch();
-    yesterdaySnapshot.forEach((doc) => {
-      batch.update(doc.ref, {
-        isActive: false,
-        deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    
+    // Deactivate all currently active opinions
+    const opinionsRef = db.collection("dailyOpinions");
+    const activeOpinionsQuery = opinionsRef.where("isActive", "==", true);
+    const activeSnapshot = await activeOpinionsQuery.get();
+
+    // Only deactivate opinions that aren't today's (in case of multiple active)
+    activeSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const todayString = today.toISOString().split('T')[0];
+      
+      // Don't deactivate today's opinion if it was just activated
+      if (data.publishAt !== todayString) {
+        batch.update(doc.ref, {
+          isActive: false,
+          deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
     });
 
-    // Archive yesterday's responses
+    // Archive previous day's responses
     const responsesRef = db.collection("responses");
-    const yesterdayResponses = await responsesRef
+    const previousResponses = await responsesRef
       .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(yesterday))
       .where("timestamp", "<", admin.firestore.Timestamp.fromDate(today))
       .get();
 
     const archiveRef = db.collection("archivedResponses");
-    yesterdayResponses.forEach((doc) => {
+    previousResponses.forEach((doc) => {
       const archiveDoc = archiveRef.doc(doc.id);
       batch.set(archiveDoc, {
         ...doc.data(),
@@ -464,14 +482,23 @@ exports.midnightReset = functions.scheduler.onSchedule({
       });
       batch.delete(doc.ref);
     });
-    await batch.commit();
-    // Activate today's opinion
-    const activationResult = await activateNextOpinion();
-    console.log("Opinion activation result:", activationResult);
 
-    return activationResult;
+    // Commit all changes atomically
+    await batch.commit();
+    
+    console.log(`✅ Midnight reset completed successfully`);
+    console.log(`📊 Archived ${previousResponses.size} responses`);
+    console.log(`🗑️ Deactivated ${activeSnapshot.size} previous opinions`);
+
+    return {
+      success: true, 
+      message: "Midnight reset completed successfully",
+      activationResult,
+      archivedResponses: previousResponses.size,
+      deactivatedOpinions: activeSnapshot.size
+    };
   } catch (error) {
-    console.error("Error in midnight reset:", error);
+    console.error("❌ Error in midnight reset:", error);
     return {success: false, error: error.message};
   }
 }); // ← This closes the midnightReset function
@@ -1081,3 +1108,712 @@ function calculateStreakFromDates(participationDates) {
   }
   return streak;
 }
+
+/**
+ * Search for users by display name or email
+ */
+exports.searchUsers = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUserId = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUserId = decodedToken.uid;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    const {searchTerm} = req.method === "GET" ? req.query : req.body;
+
+    if (!searchTerm || searchTerm.trim().length < 2) {
+      res.status(400).json({error: "Search term must be at least 2 characters"});
+      return;
+    }
+
+    const searchLower = searchTerm.toLowerCase().trim();
+    
+    // Search in users collection
+    const usersRef = db.collection("users");
+    const usersSnapshot = await usersRef.get();
+    
+    const results = [];
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      if (doc.id === currentUserId) return; // Don't include current user
+      
+      const displayName = (userData.displayName || "").toLowerCase();
+      const email = (userData.email || "").toLowerCase();
+      
+      if (displayName.includes(searchLower) || email.includes(searchLower)) {
+        results.push({
+          uid: doc.id,
+          displayName: userData.displayName,
+          email: userData.email,
+          photoURL: userData.photoURL,
+          createdAt: userData.createdAt
+        });
+      }
+    });
+
+    // Limit results
+    const limitedResults = results.slice(0, 20);
+
+    res.json({
+      success: true,
+      users: limitedResults,
+      totalFound: results.length
+    });
+
+  } catch (error) {
+    console.error("Error searching users:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Send friend request
+ */
+exports.sendFriendRequest = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUserId = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUserId = decodedToken.uid;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    const {targetUserId} = req.body;
+
+    if (!targetUserId) {
+      res.status(400).json({error: "Target user ID required"});
+      return;
+    }
+
+    if (currentUserId === targetUserId) {
+      res.status(400).json({error: "Cannot send friend request to yourself"});
+      return;
+    }
+
+    // Check if request already exists
+    const friendRequestsRef = db.collection("friendRequests");
+    const existingQuery = friendRequestsRef
+      .where("senderId", "==", currentUserId)
+      .where("receiverId", "==", targetUserId);
+    
+    const existingSnapshot = await existingQuery.get();
+    
+    if (!existingSnapshot.empty) {
+      res.status(400).json({error: "Friend request already sent"});
+      return;
+    }
+
+    // Check if they're already friends
+    const friendshipsRef = db.collection("friendships");
+    const friendshipQuery = friendshipsRef
+      .where("users", "array-contains", currentUserId);
+    
+    const friendshipSnapshot = await friendshipQuery.get();
+    const alreadyFriends = friendshipSnapshot.docs.some(doc => {
+      const users = doc.data().users;
+      return users.includes(targetUserId);
+    });
+
+    if (alreadyFriends) {
+      res.status(400).json({error: "Already friends with this user"});
+      return;
+    }
+
+    // Create friend request
+    const requestData = {
+      senderId: currentUserId,
+      receiverId: targetUserId,
+      status: "pending",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await friendRequestsRef.add(requestData);
+
+    res.json({
+      success: true,
+      message: "Friend request sent successfully",
+      requestId: docRef.id
+    });
+
+  } catch (error) {
+    console.error("Error sending friend request:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Respond to friend request (accept/decline)
+ */
+exports.respondToFriendRequest = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUserId = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUserId = decodedToken.uid;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    const {requestId, response} = req.body;
+
+    if (!requestId || !response) {
+      res.status(400).json({error: "Request ID and response required"});
+      return;
+    }
+
+    if (!["accept", "decline"].includes(response)) {
+      res.status(400).json({error: "Response must be 'accept' or 'decline'"});
+      return;
+    }
+
+    // Get the friend request
+    const requestDoc = await db.collection("friendRequests").doc(requestId).get();
+    
+    if (!requestDoc.exists) {
+      res.status(404).json({error: "Friend request not found"});
+      return;
+    }
+
+    const requestData = requestDoc.data();
+    
+    if (requestData.receiverId !== currentUserId) {
+      res.status(403).json({error: "Not authorized to respond to this request"});
+      return;
+    }
+
+    if (requestData.status !== "pending") {
+      res.status(400).json({error: "Request has already been responded to"});
+      return;
+    }
+
+    const batch = db.batch();
+
+    // Update request status
+    batch.update(requestDoc.ref, {
+      status: response,
+      respondedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    if (response === "accept") {
+      // Create friendship
+      const friendshipRef = db.collection("friendships").doc();
+      batch.set(friendshipRef, {
+        users: [requestData.senderId, currentUserId],
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: "active"
+      });
+    }
+
+    await batch.commit();
+
+    res.json({
+      success: true,
+      message: response === "accept" ? "Friend request accepted" : "Friend request declined"
+    });
+
+  } catch (error) {
+    console.error("Error responding to friend request:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Get user's friends list
+ */
+exports.getFriends = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUserId = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUserId = decodedToken.uid;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    // Get friendships
+    const friendshipsRef = db.collection("friendships");
+    const friendshipQuery = friendshipsRef
+      .where("users", "array-contains", currentUserId)
+      .where("status", "==", "active");
+    
+    const friendshipSnapshot = await friendshipQuery.get();
+    
+    if (friendshipSnapshot.empty) {
+      res.json({
+        success: true,
+        friends: []
+      });
+      return;
+    }
+
+    // Get friend user IDs
+    const friendUserIds = [];
+    friendshipSnapshot.forEach(doc => {
+      const users = doc.data().users;
+      const friendId = users.find(id => id !== currentUserId);
+      if (friendId) friendUserIds.push(friendId);
+    });
+
+    // Get friend user details
+    const friends = [];
+    for (const friendId of friendUserIds) {
+      try {
+        const userDoc = await db.collection("users").doc(friendId).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          friends.push({
+            uid: friendId,
+            displayName: userData.displayName,
+            email: userData.email,
+            photoURL: userData.photoURL,
+            createdAt: userData.createdAt
+          });
+        }
+      } catch (error) {
+        console.warn("Could not fetch friend data:", friendId, error);
+      }
+    }
+
+    res.json({
+      success: true,
+      friends: friends
+    });
+
+  } catch (error) {
+    console.error("Error getting friends:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Get friends' daily opinions
+ */
+exports.getFriendsOpinions = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUserId = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUserId = decodedToken.uid;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    const {opinionId} = req.method === "GET" ? req.query : req.body;
+
+    // Get current active opinion if not specified
+    let targetOpinionId = opinionId;
+    if (!targetOpinionId) {
+      const activeOpinionQuery = db.collection("dailyOpinions").where("isActive", "==", true).limit(1);
+      const activeSnapshot = await activeOpinionQuery.get();
+      if (!activeSnapshot.empty) {
+        targetOpinionId = activeSnapshot.docs[0].id;
+      } else {
+        res.json({
+          success: true,
+          friendsOpinions: [],
+          message: "No active opinion found"
+        });
+        return;
+      }
+    }
+
+    // Get user's friends
+    const friendshipsRef = db.collection("friendships");
+    const friendshipQuery = friendshipsRef
+      .where("users", "array-contains", currentUserId)
+      .where("status", "==", "active");
+    
+    const friendshipSnapshot = await friendshipQuery.get();
+    
+    if (friendshipSnapshot.empty) {
+      res.json({
+        success: true,
+        friendsOpinions: [],
+        message: "No friends found"
+      });
+      return;
+    }
+
+    // Get friend user IDs
+    const friendUserIds = [];
+    friendshipSnapshot.forEach(doc => {
+      const users = doc.data().users;
+      const friendId = users.find(id => id !== currentUserId);
+      if (friendId) friendUserIds.push(friendId);
+    });
+
+    // Get friends' responses to this opinion
+    const responsesRef = db.collection("responses");
+    const friendsOpinions = [];
+
+    for (const friendId of friendUserIds) {
+      try {
+        // Get friend's response
+        const responseQuery = responsesRef
+          .where("opinionId", "==", targetOpinionId)
+          .where("userId", "==", friendId)
+          .limit(1);
+        
+        const responseSnapshot = await responseQuery.get();
+        
+        if (!responseSnapshot.empty) {
+          const responseDoc = responseSnapshot.docs[0];
+          const responseData = responseDoc.data();
+          
+          // Get friend's user details
+          const userDoc = await db.collection("users").doc(friendId).get();
+          const userData = userDoc.exists ? userDoc.data() : {};
+          
+          friendsOpinions.push({
+            id: responseDoc.id,
+            userId: friendId,
+            displayName: userData.displayName || "Unknown User",
+            email: userData.email,
+            photoURL: userData.photoURL,
+            stance: responseData.stance,
+            reasoning: responseData.reasoning,
+            timestamp: responseData.timestamp,
+            createdAt: responseData.createdAt
+          });
+        }
+      } catch (error) {
+        console.warn("Could not fetch friend's opinion:", friendId, error);
+      }
+    }
+
+    res.json({
+      success: true,
+      opinionId: targetOpinionId,
+      friendsOpinions: friendsOpinions,
+      totalFriends: friendUserIds.length,
+      friendsWithOpinions: friendsOpinions.length
+    });
+
+  } catch (error) {
+    console.error("Error getting friends' opinions:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Create or update user profile in Firestore when they authenticate
+ */
+exports.createUserProfile = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUser = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUser = decodedToken;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    // Create or update user document in Firestore
+    const userRef = db.collection("users").doc(currentUser.uid);
+    const userDoc = await userRef.get();
+
+    const userData = {
+      uid: currentUser.uid,
+      email: currentUser.email,
+      displayName: currentUser.name || currentUser.email?.split('@')[0] || "User",
+      photoURL: currentUser.picture || null,
+      createdAt: userDoc.exists ? userDoc.data().createdAt : admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastLoginAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    await userRef.set(userData, { merge: true });
+
+    res.json({
+      success: true,
+      message: "User profile created/updated successfully",
+      user: {
+        uid: userData.uid,
+        email: userData.email,
+        displayName: userData.displayName
+      }
+    });
+
+  } catch (error) {
+    console.error("Error creating user profile:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Update user profile photo
+ */
+exports.updateProfilePhoto = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUserId = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUserId = decodedToken.uid;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    const {photoURL} = req.body;
+
+    if (!photoURL) {
+      res.status(400).json({error: "Photo URL required"});
+      return;
+    }
+
+    // Update user document in Firestore
+    const userRef = db.collection("users").doc(currentUserId);
+    await userRef.update({
+      photoURL: photoURL,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    res.json({
+      success: true,
+      message: "Profile photo updated successfully",
+      photoURL: photoURL
+    });
+
+  } catch (error) {
+    console.error("Error updating profile photo:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * Get pending friend requests for a user
+ */
+exports.getPendingFriendRequests = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    // Verify user is authenticated
+    let currentUserId = null;
+    if (req.headers.authorization) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        currentUserId = decodedToken.uid;
+      } catch (error) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+    } else {
+      res.status(401).json({error: "Authentication required"});
+      return;
+    }
+
+    // Get pending requests where user is the receiver
+    const friendRequestsRef = db.collection("friendRequests");
+    const pendingQuery = friendRequestsRef
+      .where("receiverId", "==", currentUserId)
+      .where("status", "==", "pending");
+    
+    const pendingSnapshot = await pendingQuery.get();
+    
+    if (pendingSnapshot.empty) {
+      res.json({
+        success: true,
+        requests: []
+      });
+      return;
+    }
+
+    // Get sender details for each request
+    const requests = [];
+    for (const doc of pendingSnapshot.docs) {
+      try {
+        const requestData = doc.data();
+        const senderDoc = await db.collection("users").doc(requestData.senderId).get();
+        
+        if (senderDoc.exists) {
+          const senderData = senderDoc.data();
+          requests.push({
+            id: doc.id,
+            senderId: requestData.senderId,
+            senderName: senderData.displayName,
+            senderEmail: senderData.email,
+            senderPhotoURL: senderData.photoURL,
+            createdAt: requestData.createdAt
+          });
+        }
+      } catch (error) {
+        console.warn("Could not fetch sender data:", requestData.senderId, error);
+      }
+    }
+
+    res.json({
+      success: true,
+      requests: requests
+    });
+
+  } catch (error) {
+    console.error("Error getting pending friend requests:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});

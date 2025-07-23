@@ -86,7 +86,7 @@ IMPORTANT: Provide a substantive response between 200-600 characters. Be thoroug
 
     for (const sentence of sentences) {
       const potential = truncated + sentence.trim() + '. '
-      if (potential.length > 800 || sentenceCount >= 6) {
+      if (potential.length > 600 || sentenceCount >= 4) {
         break
       }
       truncated = potential

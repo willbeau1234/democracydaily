@@ -240,14 +240,21 @@ Join my private discussion: ${createdOpinion.shareableLink}
               {/* Dropdown Menu */}
               {isOpinionDropdownOpen && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border-2 border-gray-300 rounded-lg shadow-lg z-10">
-                  <div className="py-2">
-                    <a href="/" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
-                      📰 Daily Opinion
-                    </a>
-                    <a href="/diy" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif bg-gray-100">
-                      ✍️ Create Opinion (Current)
-                    </a>
-                  </div>
+                 <div className="py-2">
+                  <a href="/" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
+                    🏠 Main Opinion
+                  </a>
+                </div>
+                <div className="py-2">
+                  <a href="/pro" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
+                    👤 profile
+                  </a>
+                </div>
+                <div className="py-2">
+                  <a href="/Friends" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
+                    🤝 Friends
+                  </a>
+                </div>
                 </div>
               )}
             </div>

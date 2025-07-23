@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Clock, Users, Trophy, MessageSquare, Send } from "lucide-react"
 import { generateDebateResponse } from "./actions"  // ← Removed Server Action import
+import { useRouter } from "next/navigation"
 
 
 type Persona = "pro" | "con" | "moderator" | "judge"
@@ -69,15 +70,16 @@ const parseJudgeScores = (judgmentText: string): Scores => {
       con: { logic: 0, argumentation: 0, rebuttals: 0, engagement: 0 } 
     }
     
-    const proSection = judgmentText.match(/PRO.*?SCORES?:?(.*?)(?:CON|OPPOSITION)/is)
-    const conSection = judgmentText.match(/(?:CON|OPPOSITION).*?SCORES?:?(.*?)(?:WINNER|CONCLUSION|$)/is)
+    // More flexible section matching
+    const proSection = judgmentText.match(/PRO\s+SCORES?[^:]*:?\s*((?:.*?\n?)*?)(?=CON\s+SCORES?|OPPOSITION\s+SCORES?|WINNER|$)/is)
+    const conSection = judgmentText.match(/(?:CON\s+SCORES?|OPPOSITION\s+SCORES?)[^:]*:?\s*((?:.*?\n?)*?)(?=WINNER|CONCLUSION|$)/is)
 
     if (proSection && proSection[1]) {
       const proText = proSection[1]
-      scores.pro.logic = extractScore(proText, /Logic.*?(\d+)/i) || defaultScores.pro.logic
-      scores.pro.argumentation = extractScore(proText, /Argumentation.*?(\d+)/i) || defaultScores.pro.argumentation
-      scores.pro.rebuttals = extractScore(proText, /Rebuttals.*?(\d+)/i) || defaultScores.pro.rebuttals
-      scores.pro.engagement = extractScore(proText, /Engagement.*?(\d+)/i) || defaultScores.pro.engagement
+      scores.pro.logic = extractScore(proText, /(?:Logic|Logic\s*&\s*Evidence)[^:]*:\s*(\d+)/i) ?? defaultScores.pro.logic
+      scores.pro.argumentation = extractScore(proText, /Argumentation[^:]*:\s*(\d+)/i) ?? defaultScores.pro.argumentation
+      scores.pro.rebuttals = extractScore(proText, /Rebuttals?[^:]*:\s*(\d+)/i) ?? defaultScores.pro.rebuttals
+      scores.pro.engagement = extractScore(proText, /Engagement[^:]*:\s*(\d+)/i) ?? defaultScores.pro.engagement
     } else {
       scores.pro.logic = extractScore(judgmentText, /(?:proposition|pro).*?(?:logic|evidence).*?(\d+)/i) || defaultScores.pro.logic
       scores.pro.argumentation = extractScore(judgmentText, /(?:proposition|pro).*?argumentation.*?(\d+)/i) || defaultScores.pro.argumentation
@@ -87,10 +89,10 @@ const parseJudgeScores = (judgmentText: string): Scores => {
 
     if (conSection && conSection[1]) {
       const conText = conSection[1]
-      scores.con.logic = extractScore(conText, /Logic.*?(\d+)/i) || defaultScores.con.logic
-      scores.con.argumentation = extractScore(conText, /Argumentation.*?(\d+)/i) || defaultScores.con.argumentation
-      scores.con.rebuttals = extractScore(conText, /Rebuttals.*?(\d+)/i) || defaultScores.con.rebuttals
-      scores.con.engagement = extractScore(conText, /Engagement.*?(\d+)/i) || defaultScores.con.engagement
+      scores.con.logic = extractScore(conText, /(?:Logic|Logic\s*&\s*Evidence)[^:]*:\s*(\d+)/i) || defaultScores.con.logic
+      scores.con.argumentation = extractScore(conText, /Argumentation[^:]*:\s*(\d+)/i) || defaultScores.con.argumentation
+      scores.con.rebuttals = extractScore(conText, /Rebuttals?[^:]*:\s*(\d+)/i) || defaultScores.con.rebuttals
+      scores.con.engagement = extractScore(conText, /Engagement[^:]*:\s*(\d+)/i) || defaultScores.con.engagement
     } else {
       scores.con.logic = extractScore(judgmentText, /(?:opposition|con).*?(?:logic|evidence).*?(\d+)/i) || defaultScores.con.logic
       scores.con.argumentation = extractScore(judgmentText, /(?:opposition|con).*?argumentation.*?(\d+)/i) || defaultScores.con.argumentation
@@ -108,7 +110,10 @@ const extractScore = (text: string, pattern: RegExp): number | null => {
   const match = text.match(pattern)
   if (match && match[1]) {
     const score = parseInt(match[1])
-    return (score >= 0 && score <= 25) ? score : null
+    const isValid = (score >= 0 && score <= 25)
+    console.log(`  Score found: ${score} (valid: ${isValid}) for pattern: ${pattern}`)
+    console.log(`  Match: "${match[0]}"`)
+    return isValid ? score : null
   }
   return null
 }
@@ -116,6 +121,7 @@ const extractScore = (text: string, pattern: RegExp): number | null => {
 // Separate component that uses useSearchParams
 function VirtualDebateSimulationContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   
   // Get debate data from URL parameters
   const opinionOfTheDay = searchParams.get('opinionOfTheDay') || "No topic provided"
@@ -673,8 +679,18 @@ Then provide detailed feedback explaining your decision, highlighting the strong
             </Card>
           </div>
         </div>
+        <div className="mt-8 border-t pt-6">
+        <div className="flex justify-center">
+          <button 
+            onClick={() => router.push('/')}
+            className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors shadow-lg"
+          >
+            🏠 Back to Main Page
+          </button>
+        </div>
       </div>
     </div>
+  </div>
   )
 }
 

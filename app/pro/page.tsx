@@ -7,53 +7,91 @@ import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { AuthUser, UserProfile, OpinionResponse } from '@/lib/types';
 
+// User Summary Interface
+interface UserSummary {
+  userId: string;
+  totalResponses: number;
+  participationDates: string[];
+  responsesByDate: Record<string, string>;
+  stancesByDate: Record<string, string>;
+  stats: {
+    agreeCount: number;
+    disagreeCount: number;
+  };
+  currentStreak: number;
+  lastResponse: string;
+  lastResponseTime: string;
+}
+
 // GitHub-style Calendar Component
-function OpinionCalendar({ userId }: { userId: string }) {
+function OpinionCalendar({ authUserId }: { authUserId: string }) {
   const [responses, setResponses] = useState<OpinionResponse[]>([]);
+  const [userSummary, setUserSummary] = useState<UserSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Get anonymous user ID (same logic as your opinion game)
-  function getOrCreateUserId() {
-    let id = localStorage.getItem("anonUserId");
-    if (!id) {
-      // If no anonymous ID exists, we can't show calendar data
-      return null;
-    }
-    return id;
-  }
-
   useEffect(() => {
-    fetchUserResponses();
-  }, [userId]);
+    fetchUserData();
+  }, [authUserId]);
 
-  const fetchUserResponses = async () => {
+  const fetchUserData = async () => {
     try {
-      console.log('📅 Fetching user responses for calendar...');
+      console.log('📅 Fetching user data for:', authUserId);
       
-      // Use the anonymous user ID instead of Firebase auth ID
-      const anonUserId = getOrCreateUserId();
-      if (!anonUserId) {
-        console.log('No anonymous user ID found');
-        setLoading(false);
-        return;
+      // First, try to get userSummary data (the proper way)
+      const summaryDoc = await getDoc(doc(db, 'userSummaries', authUserId));
+      
+      if (summaryDoc.exists()) {
+        const summaryData = summaryDoc.data() as UserSummary;
+        console.log('✅ Found user summary:', summaryData);
+        setUserSummary(summaryData);
+        
+        // Get detailed responses using the responsesByDate mapping
+        const responseIds = Object.values(summaryData.responsesByDate || {});
+        if (responseIds.length > 0) {
+          const detailedResponses: (OpinionResponse & { id: string })[] = [];
+          
+          // Fetch each response by ID for detailed data
+          for (const responseId of responseIds) {
+            try {
+              const responseDoc = await getDoc(doc(db, 'responses', responseId));
+              if (responseDoc.exists()) {
+                const responseData = responseDoc.data() as OpinionResponse;
+                detailedResponses.push({ ...responseData, id: responseDoc.id });
+              }
+            } catch (error) {
+              console.warn('Could not fetch response:', responseId, error);
+            }
+          }
+          
+          console.log('✅ Found detailed responses:', detailedResponses.length);
+          setResponses(detailedResponses);
+        }
+      } else {
+        console.log('⚠️ No user summary found, trying fallback method...');
+        
+        // Fallback: Get anonymous user ID and fetch responses directly
+        const anonUserId = localStorage.getItem("anonUserId");
+        if (anonUserId) {
+          console.log('🔄 Falling back to anonymous user ID:', anonUserId);
+          
+          const responsesRef = collection(db, 'responses');
+          const q = query(responsesRef, where('userId', '==', anonUserId));
+          const querySnapshot = await getDocs(q);
+          
+          const userResponses: (OpinionResponse & { id: string })[] = [];
+          querySnapshot.forEach((doc) => {
+            const data = doc.data() as OpinionResponse;
+            userResponses.push({ ...data, id: doc.id });
+          });
+          
+          console.log('✅ Found fallback responses:', userResponses.length);
+          setResponses(userResponses);
+        } else {
+          console.log('❌ No anonymous user ID found either');
+        }
       }
-      
-      const responsesRef = collection(db, 'responses');
-      const q = query(responsesRef, where('userId', '==', anonUserId));
-      const querySnapshot = await getDocs(q);
-      
-      const userResponses: (OpinionResponse & { id: string })[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data() as OpinionResponse;
-        userResponses.push({ ...data, id: doc.id });
-      });
-      
-      console.log('✅ Found responses:', userResponses.length);
-      console.log('📋 Sample response data:', userResponses[0]);
-      
-      setResponses(userResponses);
     } catch (error) {
-      console.error('❌ Error fetching responses:', error);
+      console.error('❌ Error fetching user data:', error);
     } finally {
       setLoading(false);
     }
@@ -143,6 +181,10 @@ function OpinionCalendar({ userId }: { userId: string }) {
     // Create a map of date strings to responses for faster lookup
     const responsesByDate = new Map<string, OpinionResponse[]>();
     
+    // If we have userSummary, use participationDates for more accurate data
+    const participationDates = new Set(userSummary?.participationDates || []);
+    const stancesByDate = userSummary?.stancesByDate || {};
+    
     responses.forEach(response => {
       const dateStr = getDateFromResponse(response);
       if (dateStr) {
@@ -153,23 +195,40 @@ function OpinionCalendar({ userId }: { userId: string }) {
       }
     });
     
+    console.log('📊 Participation dates from userSummary:', Array.from(participationDates));
     console.log('📊 Responses by date:', Array.from(responsesByDate.entries()));
+    console.log('📊 Stances by date:', stancesByDate);
     
     while (current <= today) {
       const dateStr = current.toISOString().split('T')[0];
       const dayResponses = responsesByDate.get(dateStr) || [];
+      
+      // Check if user participated on this date (from userSummary)
+      const hasParticipated = participationDates.has(dateStr);
+      const stance = stancesByDate[dateStr];
       
       const response = dayResponses.length > 0 ? dayResponses[0] : null;
       const totalIntensity = dayResponses.reduce((sum, r) => 
         sum + getIntensity(r), 0
       );
       
+      // If we have userSummary data but no detailed response, show participation
+      let intensity = 0;
+      if (dayResponses.length > 0) {
+        intensity = Math.min(4, Math.max(1, Math.ceil(totalIntensity / dayResponses.length)));
+      } else if (hasParticipated) {
+        // Show participation even without detailed response data
+        intensity = 2; // Medium intensity for participation without details
+      }
+      
       days.push({
         date: new Date(current),
         dateStr: dateStr,
         response: response,
         allResponses: dayResponses,
-        intensity: dayResponses.length > 0 ? Math.min(4, Math.max(1, Math.ceil(totalIntensity / dayResponses.length))) : 0
+        intensity: intensity,
+        hasParticipated: hasParticipated,
+        stance: stance
       });
       
       current.setDate(current.getDate() + 1);
@@ -314,7 +373,11 @@ function OpinionCalendar({ userId }: { userId: string }) {
   const displayGrid = transposeForDisplay();
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const totalResponses = responses.length;
+  // Use userSummary data if available, fallback to responses
+  const totalResponses = userSummary?.totalResponses || responses.length;
+  const currentStreak = userSummary?.currentStreak || 0;
+  const agreeCount = userSummary?.stats.agreeCount || 0;
+  const disagreeCount = userSummary?.stats.disagreeCount || 0;
   const averageLength = responses.length > 0 
     ? Math.round(responses.reduce((sum, r) => sum + r.reasoning.length, 0) / responses.length)
     : 0;
@@ -333,22 +396,30 @@ function OpinionCalendar({ userId }: { userId: string }) {
       <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity (Last 3 Months)</h4>
       
       {/* Debug Info */}
-      {responses.length > 0 && (
-        <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-          <strong>Debug Info:</strong> Found {responses.length} responses using anonymous user ID. <br/>
-          <strong>Calendar:</strong> Showing {calendarData.length} days across {Math.ceil(calendarData.length / 7)} weeks <br/>
-          <strong>Sample opinionId:</strong> {responses[0]?.opinionId || 'none'} <br/>
-          <strong>Sample stance:</strong> {responses[0]?.stance || 'none'} <br/>
-          <strong>Sample reasoning length:</strong> {responses[0]?.reasoning?.length || 0} characters <br/>
+      {userSummary && (
+        <div className="mb-4 p-2 bg-green-50 border border-green-200 rounded text-xs">
+          <strong>✅ User Summary Found:</strong> {userSummary.totalResponses} total opinions, {userSummary.participationDates.length} participation dates <br/>
+          <strong>Current Streak:</strong> {userSummary.currentStreak} days <br/>
+          <strong>Agree/Disagree:</strong> {userSummary.stats.agreeCount}/{userSummary.stats.disagreeCount} <br/>
+          <strong>Last Response:</strong> {userSummary.lastResponse} <br/>
         </div>
       )}
 
-      {responses.length === 0 && !loading && (
-        <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-          <strong>No data found.</strong> This could be because:
+      {!userSummary && responses.length > 0 && (
+        <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+          <strong>⚠️ Fallback Mode:</strong> Found {responses.length} responses using anonymous ID. <br/>
+          <strong>Issue:</strong> User summary not found - participation tracking may be incomplete. <br/>
+          <strong>Calendar:</strong> Showing {calendarData.length} days across {Math.ceil(calendarData.length / 7)} weeks <br/>
+        </div>
+      )}
+
+      {!userSummary && responses.length === 0 && !loading && (
+        <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded text-xs">
+          <strong>❌ No data found.</strong> This could be because:
           <ul className="mt-1 ml-4 list-disc">
             <li>You haven't submitted any opinions yet</li>
-            <li>You're using a different browser/device</li>
+            <li>User summary data is not being stored properly</li>
+            <li>You're using a different browser/device than when you submitted</li>
             <li>Local storage was cleared</li>
           </ul>
         </div>
@@ -360,8 +431,16 @@ function OpinionCalendar({ userId }: { userId: string }) {
           <strong>{totalResponses}</strong> opinions shared
         </div>
         <div>
-          <strong>{averageLength}</strong> average characters per response
+          <strong>{currentStreak}</strong> day current streak
         </div>
+        <div>
+          <strong>{agreeCount}</strong> agree, <strong>{disagreeCount}</strong> disagree
+        </div>
+        {averageLength > 0 && (
+          <div>
+            <strong>{averageLength}</strong> avg characters per response
+          </div>
+        )}
       </div>
       
       {/* Calendar Grid */}
@@ -406,9 +485,9 @@ function OpinionCalendar({ userId }: { userId: string }) {
                       day ? getIntensityClass(day.intensity) : 'bg-gray-50'
                     }`}
                     title={day ? `${day.date.toLocaleDateString()}: ${
-                      day.allResponses && day.allResponses.length > 0
-                        ? `${day.allResponses.length} response(s) - ${day.allResponses.map(r => r.stance).join(', ')}`
-                        : 'No response'
+                      day.hasParticipated
+                        ? `Participated (${day.stance || 'unknown stance'})${day.allResponses && day.allResponses.length > 0 ? ` - ${day.allResponses.length} detailed response(s)` : ''}`
+                        : 'No participation'
                     }` : ''}
                   />
                 ))
@@ -597,7 +676,7 @@ export default function ProfileView() {
         </div>
 
         {/* Opinion Activity Calendar */}
-        <OpinionCalendar userId="anonymous" />
+        <OpinionCalendar authUserId={user.uid} />
 
         {/* Navigation Buttons */}
         <div className="mt-8 border-t pt-6">

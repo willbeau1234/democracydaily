@@ -571,6 +571,15 @@ const checkUserProfileOnReturn = async (user: AuthUser) => {
   }
 };
 useEffect(() => {
+  // Check if user has seen onboarding (only on client side)
+  if (typeof window !== 'undefined') {
+    const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
+    if (!hasSeenOnboarding) {
+      router.push('/onboarding');
+      return;
+    }
+  }
+
   const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
     if (currentUser) {
       console.log('🔄 User detected:', currentUser.email);
@@ -832,8 +841,13 @@ useEffect(() => {
                   </a>
                 </div>
                 <div className="py-2">
-                  <a href="/pro" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
+                  <a href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
                     👤 profile
+                  </a>
+                </div>
+                <div className="py-2">
+                  <a href="/Friends" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
+                    🤝 Friends
                   </a>
                 </div>
               </div>
@@ -1192,6 +1206,21 @@ useEffect(() => {
     </div>    {/* ✅ Close bottom footer bar */}
   </div>      {/* ✅ Close main footer container */}
   
+
+  {/* Retake Tour Button */}
+  <div className="fixed bottom-4 right-4 z-50">
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        localStorage.removeItem('hasSeenOnboarding');
+        router.push('/onboarding');
+      }}
+      className="px-3 py-2 bg-white/90 backdrop-blur-sm border-2 hover:bg-white shadow-lg text-xs font-serif"
+    >
+      📚 Retake Tour
+    </Button>
+  </div>
 
   <Toaster />
 </div>        
