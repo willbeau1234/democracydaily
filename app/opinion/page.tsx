@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import AdSenseScript from "@/components/AdSenseScript"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -195,6 +196,14 @@ function OpinionVotingContent() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
+      {/* AdSense Script - Only loads when opinion content is present */}
+      <AdSenseScript
+        hasContent={!!opinion && !loading}
+        isLoading={loading}
+        isAuthenticated={true}
+        contentText={opinion ? `${opinion.title} ${opinion.content}` : ''}
+        minContentLength={150}
+      />
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="bg-white border-b-4 border-black mb-6 p-6 text-center">

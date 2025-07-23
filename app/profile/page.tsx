@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { AuthUser, UserProfile, OpinionResponse } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Save, Check, X, Users } from "lucide-react";
+import { Camera, Upload, Save, Check, X, Users, Bell, UserCheck } from "lucide-react";
 import OpinionDropdown from "@/components/OpinionDropdown";
 
 // User Summary Interface
@@ -37,6 +37,18 @@ interface FriendRequest {
   senderName?: string;
   senderEmail?: string;
   senderPhotoURL?: string;
+}
+
+// Friend Interface
+interface Friend {
+  id: string;
+  userId: string;
+  displayName: string;
+  email: string;
+  photoURL?: string;
+  createdAt: any;
+  hasSubmittedToday: boolean;
+  lastSubmissionDate?: string;
 }
 
 // Helper to get auth token
@@ -104,16 +116,21 @@ function FriendRequestsManager({ userId }: { userId: string }) {
       });
 
       const data = await apiResponse.json();
+      console.log(`📦 respondToFriendRequest response:`, data);
+      
       if (data.success) {
         // Remove the request from the list
         setPendingRequests(prev => prev.filter(req => req.id !== requestId));
         
         if (response === 'accept') {
+          console.log('✅ Friend request accepted - friendship should be created');
           alert('Friend request accepted! You are now friends.');
         } else {
+          console.log('❌ Friend request declined');
           alert('Friend request declined.');
         }
       } else {
+        console.error('❌ Error responding to friend request:', data.error);
         alert('Error responding to friend request: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
@@ -203,6 +220,216 @@ function FriendRequestsManager({ userId }: { userId: string }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Friends Manager Component
+function FriendsManager({ userId }: { userId: string }) {
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [nudging, setNudging] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchFriends();
+  }, [userId]);
+
+  const fetchFriends = async () => {
+    try {
+      const token = await getAuthToken();
+      if (!token) return;
+
+      const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/getFriends', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // Transform the data to include submission status
+        const friendsWithStatus = await Promise.all(
+          (data.friends || []).map(async (friend: any) => {
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Check if friend has submitted today by looking for their response
+            try {
+              // Ensure friend.userId exists before querying
+              if (!friend.userId) {
+                console.warn('Friend missing userId:', friend);
+                return {
+                  ...friend,
+                  hasSubmittedToday: false,
+                  lastSubmissionDate: null
+                };
+              }
+              
+              const responseQuery = query(
+                collection(db, 'responses'),
+                where('userId', '==', friend.userId),
+                where('opinionId', '==', today)
+              );
+              const responseSnapshot = await getDocs(responseQuery);
+              const hasSubmittedToday = !responseSnapshot.empty;
+              
+              let lastSubmissionDate = null;
+              if (!responseSnapshot.empty) {
+                const response = responseSnapshot.docs[0].data();
+                lastSubmissionDate = response.opinionId;
+              }
+
+              return {
+                ...friend,
+                hasSubmittedToday,
+                lastSubmissionDate
+              };
+            } catch (error) {
+              console.error('Error checking friend submission status:', error);
+              return {
+                ...friend,
+                hasSubmittedToday: false,
+                lastSubmissionDate: null
+              };
+            }
+          })
+        );
+        
+        setFriends(friendsWithStatus);
+      } else {
+        console.error('Error fetching friends:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendNudge = async (friendId: string, friendName: string) => {
+    try {
+      setNudging(friendId);
+      const token = await getAuthToken();
+      if (!token) return;
+
+      const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/sendNudge', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ friendId })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert(`Nudge sent to ${friendName}! They'll get a friendly reminder to share their opinion.`);
+      } else {
+        alert('Error sending nudge: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error sending nudge:', error);
+      alert('Error sending nudge. Please try again.');
+    } finally {
+      setNudging(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="border rounded-lg p-6 bg-white">
+        <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <UserCheck className="w-5 h-5" />
+          Your Friends
+        </h4>
+        <div className="text-gray-500">Loading your friends...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border rounded-lg p-6 bg-white">
+      <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <UserCheck className="w-5 h-5" />
+        Your Friends
+        {friends.length > 0 && (
+          <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+            {friends.length}
+          </span>
+        )}
+      </h4>
+      
+      {friends.length === 0 ? (
+        <div className="text-gray-500 text-center py-4">
+          <Users className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+          <p>You haven't added any friends yet</p>
+          <p className="text-sm mt-1">Visit the Friends page to add friends and see their opinions!</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {friends.map((friend) => (
+            <div key={friend.id || friend.userId} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-12 h-12">
+                  <AvatarImage src={friend.photoURL} alt={friend.displayName} />
+                  <AvatarFallback className="bg-blue-100 text-blue-600">
+                    {friend.displayName?.split(' ').map(n => n[0]).join('') || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-gray-900">{friend.displayName}</p>
+                  <p className="text-sm text-gray-500">{friend.email}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {friend.hasSubmittedToday ? (
+                      <span className="flex items-center gap-1 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                        <Check className="w-3 h-3" />
+                        Submitted today
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full">
+                        <X className="w-3 h-3" />
+                        No submission today
+                      </span>
+                    )}
+                    {friend.lastSubmissionDate && (
+                      <span className="text-xs text-gray-400">
+                        Last: {friend.lastSubmissionDate}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                {!friend.hasSubmittedToday && (
+                  <Button
+                    onClick={() => sendNudge(friend.userId, friend.displayName)}
+                    disabled={nudging === friend.userId}
+                    size="sm"
+                    variant="outline"
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                  >
+                    {nudging === friend.userId ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
+                    ) : (
+                      <Bell className="w-4 h-4" />
+                    )}
+                    Nudge
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+          
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-700">
+              <strong>💡 Tip:</strong> Use the "Nudge" button to send a friendly reminder to friends who haven't shared their opinion today. 
+              They'll get a notification encouraging them to participate in today's discussion!
+            </p>
+          </div>
         </div>
       )}
     </div>
@@ -897,6 +1124,11 @@ export default function ProfileView() {
         {/* Friend Requests Section */}
         <div className="mb-8">
           <FriendRequestsManager userId={user.uid} />
+        </div>
+
+        {/* Friends Section */}
+        <div className="mb-8">
+          <FriendsManager userId={user.uid} />
         </div>
 
         {/* Opinion Activity Calendar */}

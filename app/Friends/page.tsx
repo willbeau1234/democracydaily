@@ -122,7 +122,12 @@ export default function FriendsOpinionApp() {
     try {
       setLoadingOpinions(true)
       const token = await getAuthToken()
-      if (!token) return
+      if (!token) {
+        console.log('❌ No auth token available')
+        return
+      }
+      
+      console.log('🔄 Loading friends\' opinions...')
       
       const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/getFriendsOpinions', {
         method: 'GET',
@@ -133,13 +138,25 @@ export default function FriendsOpinionApp() {
       })
       
       const data = await response.json()
+      console.log('📦 getFriendsOpinions response:', data)
+      
       if (data.success) {
+        console.log(`✅ Found ${data.friendsOpinions?.length || 0} friends' opinions`)
+        if (data.message) {
+          console.log('ℹ️ Message:', data.message)
+        }
+        if (data.totalFriends !== undefined) {
+          console.log(`👫 Total friends: ${data.totalFriends}`)
+          console.log(`💭 Friends with opinions: ${data.friendsWithOpinions}`)
+        }
         setFriendsOpinions(data.friendsOpinions || [])
       } else {
-        console.error('Failed to load friends opinions:', data.error)
+        console.error('❌ Failed to load friends opinions:', data.error)
+        alert(`Error loading friends: ${data.error}`)
       }
     } catch (error) {
-      console.error('Error loading friends opinions:', error)
+      console.error('❌ Error loading friends opinions:', error)
+      alert('Error loading friends. Please check console for details.')
     } finally {
       setLoadingOpinions(false)
     }
@@ -182,6 +199,8 @@ export default function FriendsOpinionApp() {
       const token = await getAuthToken()
       if (!token) return
       
+      console.log(`🔄 Sending friend request to: ${targetUserId}`)
+      
       const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/sendFriendRequest', {
         method: 'POST',
         headers: {
@@ -192,18 +211,58 @@ export default function FriendsOpinionApp() {
       })
       
       const data = await response.json()
+      console.log('📦 sendFriendRequest response:', data)
+      
       if (data.success) {
+        console.log('✅ Friend request sent successfully')
         alert('Friend request sent!')
         // Remove from search results
         setSearchResults(prev => prev.filter(user => user.uid !== targetUserId))
       } else {
+        console.error('❌ Failed to send friend request:', data.error)
         alert(data.error || 'Failed to send friend request')
       }
     } catch (error) {
-      console.error('Error sending friend request:', error)
+      console.error('❌ Error sending friend request:', error)
       alert('Error sending friend request')
     } finally {
       setSendingRequest(null)
+    }
+  }
+
+  // Debug function to help troubleshoot friends system
+  const debugFriendsSystem = async () => {
+    try {
+      const token = await getAuthToken()
+      if (!token) {
+        alert('Not authenticated')
+        return
+      }
+
+      console.log('🔍 DEBUGGING FRIENDS SYSTEM:')
+      console.log('Current user:', user)
+      
+      // Try to get friends opinions with detailed logging
+      console.log('1. Testing getFriendsOpinions...')
+      const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/getFriendsOpinions', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      const data = await response.json()
+      console.log('Full response:', data)
+      
+      if (data.message) {
+        alert(`Debug Info: ${data.message}\nCheck console for full details.`)
+      } else {
+        alert(`Found ${data.friendsOpinions?.length || 0} friends' opinions.\nCheck console for details.`)
+      }
+    } catch (error) {
+      console.error('Debug error:', error)
+      alert('Debug failed - check console')
     }
   }
 
@@ -507,7 +566,21 @@ export default function FriendsOpinionApp() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1" />
             <h2 className="text-2xl font-bold text-gray-900">Friends' Opinions</h2>
-            <div className="flex-1 flex justify-end">
+            <div className="flex-1 flex justify-end gap-2">
+              <button
+                onClick={debugFriendsSystem}
+                className="p-2 rounded-full bg-red-100 hover:bg-red-200 transition-colors text-xs"
+                title="Debug friends system"
+              >
+                🐛
+              </button>
+              <button
+                onClick={loadFriendsOpinions}
+                className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors"
+                title="Refresh friends' opinions"
+              >
+                🔄
+              </button>
               <button
                 onClick={() => setShowSearch(!showSearch)}
                 className="p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow"
@@ -520,7 +593,7 @@ export default function FriendsOpinionApp() {
           <p className="text-gray-600">
             {friendsOpinions.length > 0 
               ? "Swipe to see what your friends are thinking" 
-              : "Add friends to see their opinions!"}
+              : "Add friends to see their opinions! Use the 🐛 button if you think there's an issue."}
           </p>
         </div>
 

@@ -1,6 +1,7 @@
 "use client" // Tells Next.js this is a client-side component
 
 import { useState, useCallback, useMemo, use, useEffect, useRef } from "react"
+import AdSenseScript from "@/components/AdSenseScript"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -381,7 +382,7 @@ export default function OpinionGame() {
           setOpinionPiece(todayOpinion.content)
 
         } else {
-          setOpinionPiece("🛠️ **Under Maintenance**...")  // ← This is showing because getTodayOpinion() returns null
+          setOpinionPiece("We're preparing today's civic discussion. Please check back in a few moments for a thought-provoking opinion piece that will engage our democratic community in meaningful dialogue about the issues that matter most to our society.")
         }
       } catch (error) {
         console.error("Error loading opinion:", error)
@@ -807,6 +808,14 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-3 sm:p-4 flex flex-col items-center">
+      {/* AdSense Script - Only loads when substantial content is present */}
+      <AdSenseScript
+        hasContent={hasClicked && isAnimationComplete && !!opinionPiece && !opinionPiece.includes("We're preparing today's")}
+        isLoading={loadingOpinion}
+        isAuthenticated={hasClicked}
+        contentText={opinionPiece + (reasoning ? ` ${reasoning}` : '')}
+        minContentLength={200}
+      />
       <div className="w-full max-w-4xl">
         {/* Newspaper-style header */}
         <div className="bg-white border-b-4 border-black mb-4 sm:mb-6 p-3 sm:p-6 text-center">
