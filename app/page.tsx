@@ -247,9 +247,9 @@ const DynamicWordCloud: React.FC<DynamicWordCloudProps> = ({ opinionId, stance }
   }, [wordData]);
 
   return (
-    <div className="border rounded-lg p-4 bg-white">
+    <div className="border rounded-lg p-3 sm:p-4 bg-white">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="font-serif text-lg font-semibold">
+        <h4 className="font-serif text-base sm:text-lg font-semibold">
           {stance === 'agree' ? '✅ Agree' : '❌ Disagree'} Word Cloud
         </h4>
         <div className="flex items-center space-x-2">
@@ -265,8 +265,8 @@ const DynamicWordCloud: React.FC<DynamicWordCloudProps> = ({ opinionId, stance }
           ref={canvasRef}
           width={400}
           height={250}
-          className="w-full h-auto border border-gray-200 rounded"
-          style={{ maxWidth: '100%', height: 'auto' }}
+          className="w-full h-auto border border-gray-200 rounded max-w-full"
+          style={{ maxWidth: '100%', height: 'auto', minHeight: '200px' }}
         />
         
         {wordData.length === 0 && !loading && (
@@ -806,12 +806,12 @@ useEffect(() => {
   })
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">
+    <div className="min-h-screen bg-gray-100 p-2 sm:p-4 flex flex-col items-center">
       <div className="w-full max-w-4xl">
         {/* Newspaper-style header */}
-        <div className="bg-white border-b-4 border-black mb-6 p-6 text-center">
-          <h1 className="text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
-          <div className="flex justify-between items-center text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-4 my-2">
+        <div className="bg-white border-b-4 border-black mb-4 sm:mb-6 p-4 sm:p-6 text-center">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
+          <div className="flex flex-col sm:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-2 sm:px-4 my-2 gap-2 sm:gap-0">
   <span>Vol. 1, No. 1</span>
   <span>{currentDate}</span>
   
@@ -868,11 +868,11 @@ useEffect(() => {
           <CardHeader className="border-b bg-gray-50">
             <CardTitle className="text-center text-2xl font-serif">Opinion of the Day</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6 p-6">
+          <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6">
 
             {!hasSubmitted ? (
               <>
-                <div className="min-h-[120px] p-6 bg-white rounded-lg border border-gray-200 font-serif text-lg">
+                <div className="min-h-[120px] p-4 sm:p-6 bg-white rounded-lg border border-gray-200 font-serif text-base sm:text-lg">
                   <KaraokeText
                     text={opinionPiece}
                     onComplete={handleAnimationComplete}
@@ -906,18 +906,18 @@ useEffect(() => {
 
                 {isAnimationComplete && (
                   <>
-                    <div className="flex justify-center gap-4 mt-6">
+                    <div className="flex justify-center gap-2 sm:gap-4 mt-6">
                       <Button
                         variant={selectedOption === "agree" ? "default" : "outline"}
                         onClick={() => setSelectedOption("agree")}
-                        className="w-32"
+                        className="w-24 sm:w-32 text-sm sm:text-base"
                       >
                         Agree
                       </Button>
                       <Button
                         variant={selectedOption === "disagree" ? "default" : "outline"}
                         onClick={() => setSelectedOption("disagree")}
-                        className="w-32"
+                        className="w-24 sm:w-32 text-sm sm:text-base"
                       >
                         Disagree
                       </Button>
@@ -967,28 +967,32 @@ useEffect(() => {
                     <Share2 className="h-5 w-5" />
                     Share your opinion
                   </h3>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={copyToClipboard} className="flex items-center gap-1">
-                      <Copy className="h-4 w-4" />
-                      Copy to clipboard
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
+                    <Button variant="outline" size="sm" onClick={copyToClipboard} className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+                      <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Copy to clipboard</span>
+                      <span className="sm:hidden">Copy</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={shareToTwitter} className="flex items-center gap-1">
-                      <FaXTwitter className="h-4 w-4" />
-                      Share on X
+                    <Button variant="outline" size="sm" onClick={shareToTwitter} className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+                      <FaXTwitter className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Share on X</span>
+                      <span className="sm:hidden">X</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={shareToFacebook} className="flex items-center gap-1">
-                      <FaFacebook className="h-4 w-4" />
-                      Share on Facebook
+                    <Button variant="outline" size="sm" onClick={shareToFacebook} className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+                      <FaFacebook className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Share on Facebook</span>
+                      <span className="sm:hidden">FB</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={shareToInstagram} className="flex items-center gap-1">
-                      <FaInstagram className="h-4 w-4" />
-                      Share on Instagram
+                    <Button variant="outline" size="sm" onClick={shareToInstagram} className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+                      <FaInstagram className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Share on Instagram</span>
+                      <span className="sm:hidden">IG</span>
                     </Button>
                   </div>
                 </div>
 
                 {displayStats && (
-                  <div className="border rounded-lg p-6 bg-gray-50">
+                  <div className="border rounded-lg p-4 sm:p-6 bg-gray-50">
                     <h3 className="font-serif text-xl font-bold mb-4 text-center">Community Pulse</h3>
                     
                     <div className="mb-4">
@@ -1042,7 +1046,7 @@ useEffect(() => {
                 {/* Dynamic Word Clouds */}
                 <div className="space-y-4">
                   <h3 className="font-serif text-xl font-bold text-center">Live Word Clouds</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     <DynamicWordCloud opinionId={today} stance="agree" />
                     <DynamicWordCloud opinionId={today} stance="disagree" />
                   </div>
@@ -1104,7 +1108,7 @@ useEffect(() => {
         {/* Enhanced Footer */}
   <div className="bg-white border-t-2 border-gray-300 mt-6">
     {/* Main Footer Content */}
-    <div className="grid md:grid-cols-3 gap-6 p-6 text-sm">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 p-4 sm:p-6 text-xs sm:text-sm">
       
       {/* See More About the Site */}
       <div className="text-center md:text-left">
