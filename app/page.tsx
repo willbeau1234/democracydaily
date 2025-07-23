@@ -26,6 +26,7 @@ import { useRouter } from 'next/navigation';
 import { AuthUser , OpinionResponse } from '@/lib/types';
 import AIvsHumanButton from '@/components/AIvsHumanButton';
 import { useRealTimeStats, useRealTimeWordCloud, useRealTimeVotes } from '@/hooks/useFirebase'
+import OpinionDropdown from "@/components/OpinionDropdown"
 
 
 
@@ -294,7 +295,6 @@ export default function OpinionGame() {
   const [opinionPiece, setOpinionPiece] = useState("")
   const [loadingOpinion, setLoadingOpinion] = useState(true)
   const [isFeedbackSent, setIsFeedbackSent] = useState(false);
-  const [isOpinionDropdownOpen, setIsOpinionDropdownOpen] = useState(false)
   const [hasClicked, setHasClicked] = useState(false);
   const [user, setUser] =   useState<AuthUser | null>(null);
   const [userOriginalResponse, setUserOriginalResponse] = useState<{
@@ -806,53 +806,17 @@ useEffect(() => {
   })
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-4 flex flex-col items-center">
+    <div className="min-h-screen bg-gray-100 p-3 sm:p-4 flex flex-col items-center">
       <div className="w-full max-w-4xl">
         {/* Newspaper-style header */}
-        <div className="bg-white border-b-4 border-black mb-4 sm:mb-6 p-4 sm:p-6 text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
+        <div className="bg-white border-b-4 border-black mb-4 sm:mb-6 p-3 sm:p-6 text-center">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
           <div className="flex flex-col sm:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-2 sm:px-4 my-2 gap-2 sm:gap-0">
   <span>Vol. 1, No. 1</span>
   <span>{currentDate}</span>
   
   {/* Opinion Section Dropdown */}
-  <div className="relative">
-            <button
-              onClick={() => setIsOpinionDropdownOpen(!isOpinionDropdownOpen)}
-              className="flex items-center gap-1 hover:text-black transition-colors font-serif"
-            >
-              Opinion Section
-              <svg 
-                className={`w-3 h-3 transition-transform ${isOpinionDropdownOpen ? 'rotate-180' : ''}`}
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {/* Dropdown Menu */}
-            {isOpinionDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-white border-2 border-gray-300 rounded-lg shadow-lg z-10">
-                <div className="py-2">
-                  <a href="/DIY" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
-                    📰 DIY
-                  </a>
-                </div>
-                <div className="py-2">
-                  <a href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
-                    👤 profile
-                  </a>
-                </div>
-                <div className="py-2">
-                  <a href="/Friends" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
-                    🤝 Friends
-                  </a>
-                </div>
-              </div>
-            )}
-            </div>
+            <OpinionDropdown sectionName="Daily Opinion" currentPage="home" />
           </div>
         </div>
       
@@ -906,18 +870,18 @@ useEffect(() => {
 
                 {isAnimationComplete && (
                   <>
-                    <div className="flex justify-center gap-2 sm:gap-4 mt-6">
+                    <div className="flex justify-center gap-3 sm:gap-4 mt-6">
                       <Button
                         variant={selectedOption === "agree" ? "default" : "outline"}
                         onClick={() => setSelectedOption("agree")}
-                        className="w-24 sm:w-32 text-sm sm:text-base"
+                        className="w-20 sm:w-32 text-sm sm:text-base px-2 sm:px-4"
                       >
                         Agree
                       </Button>
                       <Button
                         variant={selectedOption === "disagree" ? "default" : "outline"}
                         onClick={() => setSelectedOption("disagree")}
-                        className="w-24 sm:w-32 text-sm sm:text-base"
+                        className="w-20 sm:w-32 text-sm sm:text-base px-2 sm:px-4"
                       >
                         Disagree
                       </Button>

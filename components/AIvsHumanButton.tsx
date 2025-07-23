@@ -74,17 +74,17 @@ const AIvsHumanButton = ({ personOpinion, opinionOfTheDay }: AIvsHumanButtonProp
   return (
     <div className="flex flex-col items-center space-y-4">
       <div className="text-center mb-2">
-        <h3 className="font-serif text-lg font-semibold text-gray-800 mb-1">
+        <h3 className="font-serif text-base sm:text-lg font-semibold text-gray-800 mb-1">
           Ready for the ultimate showdown?
         </h3>
-        <p className="text-sm text-gray-600 font-serif">
+        <p className="text-xs sm:text-sm text-gray-600 font-serif">
           Experience AI vs Human debates like never before
         </p>
       </div>
 
       <Button
         onClick={handleClick}
-        className="relative overflow-hidden bg-gradient-to-r from-gray-900 via-black to-gray-900 hover:from-gray-800 hover:via-gray-900 hover:to-gray-800 text-white font-bold text-xl px-16 py-28 rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-gray-700"
+        className="relative overflow-hidden bg-gradient-to-r from-gray-900 via-black to-gray-900 hover:from-gray-800 hover:via-gray-900 hover:to-gray-800 text-white font-bold text-lg sm:text-xl px-6 py-16 sm:px-16 sm:py-28 rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border border-gray-700"
       >
         {/* Animated background pulse */}
         <div className={`absolute inset-0 bg-gradient-to-r from-gray-700 via-gray-600 to-gray-700 opacity-20 ${isAnimating ? 'animate-pulse' : ''}`} />
@@ -92,21 +92,21 @@ const AIvsHumanButton = ({ personOpinion, opinionOfTheDay }: AIvsHumanButtonProp
         {/* Main content */}
         <div className="relative flex items-center justify-center">
           {/* AI Side */}
-          <div className={`flex flex-col items-center w-20 transition-transform duration-500 ${isAnimating && battlePhase % 2 === 0 ? 'scale-125 -rotate-12' : ''}`}>
-            <span className="text-3xl">{ai}</span>
-            <span className="text-sm font-serif mt-1">AI</span>
+          <div className={`flex flex-col items-center w-12 sm:w-20 transition-transform duration-500 ${isAnimating && battlePhase % 2 === 0 ? 'scale-125 -rotate-12' : ''}`}>
+            <span className="text-2xl sm:text-3xl">{ai}</span>
+            <span className="text-xs sm:text-sm font-serif mt-1">AI</span>
           </div>
 
           {/* VS Symbol */}
-          <div className={`flex flex-col items-center w-20 mx-3 transition-all duration-300 ${isAnimating ? 'animate-bounce' : ''}`}>
-            <span className="text-4xl">{vs}</span>
-            <span className="text-sm font-serif mt-1">VS</span>
+          <div className={`flex flex-col items-center w-12 sm:w-20 mx-2 sm:mx-3 transition-all duration-300 ${isAnimating ? 'animate-bounce' : ''}`}>
+            <span className="text-3xl sm:text-4xl">{vs}</span>
+            <span className="text-xs sm:text-sm font-serif mt-1">VS</span>
           </div>
 
           {/* Human Side */}
-          <div className={`flex flex-col items-center w-20 transition-transform duration-500 ${isAnimating && battlePhase % 2 === 1 ? 'scale-125 rotate-12' : ''}`}>
-            <span className="text-3xl">{human}</span>
-            <span className="text-sm font-serif mt-1">HUMAN</span>
+          <div className={`flex flex-col items-center w-12 sm:w-20 transition-transform duration-500 ${isAnimating && battlePhase % 2 === 1 ? 'scale-125 rotate-12' : ''}`}>
+            <span className="text-2xl sm:text-3xl">{human}</span>
+            <span className="text-xs sm:text-sm font-serif mt-1">HUMAN</span>
           </div>
         </div>
 

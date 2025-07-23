@@ -13,6 +13,7 @@ import { createUserOpinion, CreateDIYOpinionResult } from "@/lib/firebase"
 import { v4 as uuidv4 } from "uuid"
 import TypewriterAnimation from '@/components/TypewriterAnimation'
 import { Upload, X, Image } from "lucide-react"
+import OpinionDropdown from "@/components/OpinionDropdown"
 
 export default function DIYOpinion() {
   const [title, setTitle] = useState("")
@@ -20,7 +21,6 @@ export default function DIYOpinion() {
   const [authorName, setAuthorName] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [createdOpinion, setCreatedOpinion] = useState<CreateDIYOpinionResult | null>(null)
-  const [isOpinionDropdownOpen, setIsOpinionDropdownOpen] = useState(false)
   const [isFeedbackSent, setIsFeedbackSent] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -211,53 +211,17 @@ Join my private discussion: ${createdOpinion.shareableLink}
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">
+    <div className="min-h-screen bg-gray-100 p-3 sm:p-4 flex flex-col items-center">
       <div className="w-full max-w-4xl">
         {/* Newspaper-style header */}
-        <div className="bg-white border-b-4 border-black mb-6 p-6 text-center">
-          <h1 className="text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
-          <div className="flex justify-between items-center text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-4 my-2">
+        <div className="bg-white border-b-4 border-black mb-6 p-3 sm:p-6 text-center">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
+          <div className="flex flex-col sm:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-2 sm:px-4 my-2 gap-2 sm:gap-0">
             <span>Vol. 1, No. 1</span>
             <span>{currentDate}</span>
             
             {/* Opinion Section Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsOpinionDropdownOpen(!isOpinionDropdownOpen)}
-                className="flex items-center gap-1 hover:text-black transition-colors font-serif"
-              >
-                DIY Section
-                <svg 
-                  className={`w-3 h-3 transition-transform ${isOpinionDropdownOpen ? 'rotate-180' : ''}`}
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              
-              {/* Dropdown Menu */}
-              {isOpinionDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white border-2 border-gray-300 rounded-lg shadow-lg z-10">
-                 <div className="py-2">
-                  <a href="/" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
-                    🏠 Main Opinion
-                  </a>
-                </div>
-                <div className="py-2">
-                  <a href="/pro" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
-                    👤 profile
-                  </a>
-                </div>
-                <div className="py-2">
-                  <a href="/Friends" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-serif">
-                    🤝 Friends
-                  </a>
-                </div>
-                </div>
-              )}
-            </div>
+            <OpinionDropdown sectionName="DIY" currentPage="DIY" />
           </div>
         </div>
 
@@ -283,7 +247,7 @@ Join my private discussion: ${createdOpinion.shareableLink}
                 Share your thoughts with a private discussion group
               </p>
             </CardHeader>
-            <CardContent className="p-6 space-y-4">
+            <CardContent className="p-4 sm:p-6 space-y-4">
               <div>
                 <label className="block text-sm font-bold mb-2 font-serif">Your Name (Optional)</label>
                 <Input
@@ -331,7 +295,7 @@ Join my private discussion: ${createdOpinion.shareableLink}
               <Button
                 onClick={handleCreateOpinion}
                 disabled={isCreating || !title.trim() || !content.trim()}
-                className="w-full bg-gray-900 hover:bg-black font-serif"
+                className="w-full bg-gray-900 hover:bg-black font-serif text-sm sm:text-base py-2 sm:py-3"
               >
                 {isCreating ? "Creating..." : "Create Private Discussion 🚀"}
               </Button>

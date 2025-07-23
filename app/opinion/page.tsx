@@ -10,6 +10,7 @@ import { toast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { getOpinionByToken, submitVote, subscribeToVotes, generateWordCloudData, getVotesForOpinion, getUserIdentifier, hasUserVoted, getUserVote } from '@/lib/firebase'
 import React from 'react'
+import OpinionDropdown from "@/components/OpinionDropdown"
 
 function OpinionVotingContent() {
   const searchParams = useSearchParams()
@@ -197,7 +198,19 @@ function OpinionVotingContent() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="bg-white border-b-4 border-black mb-6 p-6 text-center">
-          <h1 className="text-4xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
+          <div className="flex flex-col sm:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-2 sm:px-4 my-2 gap-2 sm:gap-0">
+            <span>Vol. 1, No. 1</span>
+            <span>{new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long", 
+              day: "numeric",
+            })}</span>
+            
+            {/* Opinion Section Dropdown */}
+            <OpinionDropdown sectionName="Opinion Discussion" currentPage="opinion" />
+          </div>
           <p className="text-gray-600 font-serif">Private Opinion Discussion</p>
         </div>
 

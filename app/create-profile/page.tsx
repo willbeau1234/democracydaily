@@ -88,16 +88,16 @@ export default function CreateProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
+    <div className="min-h-screen bg-gray-100 py-4 sm:py-8 px-3 sm:px-4">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="bg-white border-b-4 border-black mb-8 p-6 text-center">
-          <h1 className="text-4xl font-bold font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
+        <div className="bg-white border-b-4 border-black mb-6 sm:mb-8 p-4 sm:p-6 text-center">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
           <p className="text-gray-600 mt-2">Create Your Political Profile</p>
         </div>
 
         {/* Profile Form */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-8">
           <h2 className="text-2xl font-bold mb-6 text-center">
             Welcome, {user?.email}!
           </h2>

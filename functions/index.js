@@ -426,16 +426,17 @@ exports.midnightReset = functions.scheduler.onSchedule({
   try {
     console.log("🕛 Starting midnight reset process...");
     
-    // Get current Chicago time - should be exactly midnight
-    const now = new Date();
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
+    // Get proper Chicago time for date calculations
+    const chicagoTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}));
+    const today = chicagoTime.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Calculate yesterday in Chicago timezone
+    const yesterdayChicago = new Date(chicagoTime);
+    yesterdayChicago.setDate(yesterdayChicago.getDate() - 1);
+    const yesterday = yesterdayChicago.toISOString().split('T')[0];
 
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-
-    console.log(`📅 Reset date: ${today.toISOString().split('T')[0]}`);
+    console.log(`📅 Today (Chicago): ${today}`);
+    console.log(`📅 Yesterday (Chicago): ${yesterday}`);
 
     // Step 1: Activate today's opinion FIRST to prevent gaps
     console.log("🔄 Activating today's opinion...");
@@ -447,55 +448,69 @@ exports.midnightReset = functions.scheduler.onSchedule({
     
     const batch = db.batch();
     
-    // Deactivate all currently active opinions
+    // Deactivate all currently active opinions that are NOT today's
     const opinionsRef = db.collection("dailyOpinions");
     const activeOpinionsQuery = opinionsRef.where("isActive", "==", true);
     const activeSnapshot = await activeOpinionsQuery.get();
 
-    // Only deactivate opinions that aren't today's (in case of multiple active)
+    let deactivatedCount = 0;
     activeSnapshot.forEach((doc) => {
       const data = doc.data();
-      const todayString = today.toISOString().split('T')[0];
       
-      // Don't deactivate today's opinion if it was just activated
-      if (data.publishAt !== todayString) {
+      // Deactivate any opinion that's not scheduled for today
+      if (data.publishAt !== today) {
+        console.log(`🔽 Deactivating opinion from ${data.publishAt}`);
         batch.update(doc.ref, {
           isActive: false,
           deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+        deactivatedCount++;
       }
     });
 
-    // Archive previous day's responses
+    // Archive responses from all previous days (not just yesterday)
+    // This ensures we clean up any responses that might have been missed
     const responsesRef = db.collection("responses");
+    
+    // Create date boundaries for archiving (anything before today in Chicago time)
+    const todayStart = new Date(chicagoTime);
+    todayStart.setHours(0, 0, 0, 0);
+    
+    console.log(`🗂️ Archiving responses before: ${todayStart.toISOString()}`);
+    
     const previousResponses = await responsesRef
-      .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(yesterday))
-      .where("timestamp", "<", admin.firestore.Timestamp.fromDate(today))
+      .where("timestamp", "<", admin.firestore.Timestamp.fromDate(todayStart))
       .get();
 
     const archiveRef = db.collection("archivedResponses");
+    let archivedCount = 0;
+    
     previousResponses.forEach((doc) => {
+      const responseData = doc.data();
       const archiveDoc = archiveRef.doc(doc.id);
       batch.set(archiveDoc, {
-        ...doc.data(),
+        ...responseData,
         archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        archivedDate: today, // Track which reset archived this
       });
       batch.delete(doc.ref);
+      archivedCount++;
     });
 
     // Commit all changes atomically
     await batch.commit();
     
     console.log(`✅ Midnight reset completed successfully`);
-    console.log(`📊 Archived ${previousResponses.size} responses`);
-    console.log(`🗑️ Deactivated ${activeSnapshot.size} previous opinions`);
+    console.log(`📊 Archived ${archivedCount} responses`);
+    console.log(`🗑️ Deactivated ${deactivatedCount} previous opinions`);
 
     return {
       success: true, 
       message: "Midnight reset completed successfully",
       activationResult,
-      archivedResponses: previousResponses.size,
-      deactivatedOpinions: activeSnapshot.size
+      archivedResponses: archivedCount,
+      deactivatedOpinions: deactivatedCount,
+      resetDate: today
     };
   } catch (error) {
     console.error("❌ Error in midnight reset:", error);

@@ -6,6 +6,7 @@ import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firesto
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { AuthUser, UserProfile, OpinionResponse } from '@/lib/types';
+import OpinionDropdown from "@/components/OpinionDropdown";
 
 // User Summary Interface
 interface UserSummary {
@@ -580,15 +581,25 @@ export default function ProfileView() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
+    <div className="min-h-screen bg-gray-100 py-4 sm:py-8 px-3 sm:px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="bg-white border-b-4 border-black mb-8 p-6">
-          <div className="flex justify-between items-center">
-            <div className="text-center flex-1">
-              <h1 className="text-4xl font-bold font-serif tracking-tight">YOUR DEMOCRACY DAILY</h1>
-              <p className="text-gray-600 mt-2">Profile Management</p>
+        <div className="bg-white border-b-4 border-black mb-6 sm:mb-8 p-4 sm:p-6">
+          <div className="text-center">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
+            <div className="flex flex-col sm:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-2 sm:px-4 my-2 gap-2 sm:gap-0">
+              <span>Vol. 1, No. 1</span>
+              <span>{new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric", 
+                month: "long",
+                day: "numeric",
+              })}</span>
+              
+              {/* Opinion Section Dropdown */}
+              <OpinionDropdown sectionName="Pro Profile" currentPage="pro" />
             </div>
+            <p className="text-gray-600 mt-2">Profile Management</p>
           </div>
         </div>
 
@@ -598,8 +609,8 @@ export default function ProfileView() {
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
             <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-3xl font-bold">{profile.displayName}</h2>
-                <p className="text-blue-100 text-lg">{profile.email}</p>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">{profile.displayName}</h2>
+                <p className="text-blue-100 text-base sm:text-lg">{profile.email}</p>
               </div>
               <div className="text-right">
                 <p className="text-blue-100 text-sm">Member since</p>
@@ -614,25 +625,25 @@ export default function ProfileView() {
           </div>
 
           {/* Profile Body */}
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="space-y-6">
               <div className="border-b pb-4">
-                <h3 className="text-2xl font-bold">Profile Information</h3>
+                <h3 className="text-xl sm:text-2xl font-bold">Profile Information</h3>
               </div>
 
               <div className="grid md:grid-cols-2 gap-8">
                 {/* Basic Info */}
                 <div className="space-y-4">
-                  <h4 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
+                  <h4 className="text-base sm:text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
                     Account Details
                   </h4>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Display Name</label>
-                    <p className="text-lg text-gray-900">{profile.displayName}</p>
+                    <p className="text-base sm:text-lg text-gray-900">{profile.displayName}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Email</label>
-                    <p className="text-lg text-gray-900">{profile.email}</p>
+                    <p className="text-base sm:text-lg text-gray-900">{profile.email}</p>
                   </div>
                 </div>
 

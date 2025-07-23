@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ThumbsUp, ThumbsDown, Users, Clock, Search, UserPlus, X, Check } from "lucide-react"
+import OpinionDropdown from "@/components/OpinionDropdown"
 
 // Interfaces for friend system
 interface AuthUser {
@@ -105,7 +106,7 @@ export default function FriendsOpinionApp() {
       const token = await getAuthToken()
       if (!token) return
       
-      await fetch('https://us-central1-democracydaily-8f549.cloudfunctions.net/createUserProfile', {
+      await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/createUserProfile', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -123,7 +124,7 @@ export default function FriendsOpinionApp() {
       const token = await getAuthToken()
       if (!token) return
       
-      const response = await fetch('https://us-central1-democracydaily-8f549.cloudfunctions.net/getFriendsOpinions', {
+      const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/getFriendsOpinions', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -155,7 +156,7 @@ export default function FriendsOpinionApp() {
       const token = await getAuthToken()
       if (!token) return
       
-      const response = await fetch(`https://us-central1-democracydaily-8f549.cloudfunctions.net/searchUsers?searchTerm=${encodeURIComponent(term)}`, {
+      const response = await fetch(`https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/searchUsers?searchTerm=${encodeURIComponent(term)}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -181,7 +182,7 @@ export default function FriendsOpinionApp() {
       const token = await getAuthToken()
       if (!token) return
       
-      const response = await fetch('https://us-central1-democracydaily-8f549.cloudfunctions.net/sendFriendRequest', {
+      const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/sendFriendRequest', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -484,11 +485,28 @@ export default function FriendsOpinionApp() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-4">
       <div className="max-w-md mx-auto">
-        {/* Header with Search Button */}
+        {/* Newspaper-style header */}
+        <div className="bg-white border-b-4 border-black mb-4 sm:mb-6 p-4 sm:p-6 text-center">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 font-serif tracking-tight">THE DEMOCRACY DAILY</h1>
+          <div className="flex flex-col sm:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-2 sm:px-4 my-2 gap-2 sm:gap-0">
+            <span>Vol. 1, No. 1</span>
+            <span>{new Date().toLocaleDateString("en-US", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}</span>
+            
+            {/* Opinion Section Dropdown */}
+            <OpinionDropdown sectionName="Friends" currentPage="Friends" />
+          </div>
+        </div>
+
+        {/* Friends Header with Search Button */}
         <div className="text-center pt-4 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1" />
-            <h1 className="text-2xl font-bold text-gray-900">Friends' Opinions</h1>
+            <h2 className="text-2xl font-bold text-gray-900">Friends' Opinions</h2>
             <div className="flex-1 flex justify-end">
               <button
                 onClick={() => setShowSearch(!showSearch)}

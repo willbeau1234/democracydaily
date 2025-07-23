@@ -91,12 +91,20 @@ export default function OnboardingPage() {
       delay: 5000
     },
     {
+      id: "ai-debate-simulator",
+      title: "AI Debate Simulator",
+      description: "Experience the ultimate AI vs Human debate arena! Challenge AI with your opinions and engage in epic intellectual battles.",
+      icon: <Sparkles className="w-6 h-6" />,
+      position: { top: "75%", left: "50%" },
+      delay: 6000
+    },
+    {
       id: "sharing",
       title: "Social Sharing",
       description: "Share your opinions across social platforms - Twitter, Facebook, Instagram, or copy to clipboard.",
       icon: <Share2 className="w-6 h-6" />,
-      position: { top: "80%", left: "50%" },
-      delay: 6000
+      position: { top: "85%", left: "50%" },
+      delay: 7000
     }
   ]
 
@@ -226,7 +234,7 @@ export default function OnboardingPage() {
           <div className="bg-white rounded-lg shadow-2xl overflow-hidden">
             {/* Simulated header */}
             <div className="bg-white border-b-4 border-black p-6 text-center relative">
-              <h2 className="text-3xl font-bold font-serif tracking-tight">THE DEMOCRACY DAILY</h2>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold font-serif tracking-tight">THE DEMOCRACY DAILY</h2>
               <div className="flex justify-between items-center text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-4 my-2">
                 <span>Vol. 1, No. 1</span>
                 <span>Demo Mode</span>
@@ -327,6 +335,37 @@ export default function OnboardingPage() {
                       <div className="h-32 bg-gradient-to-br from-red-50 to-red-100 rounded flex items-center justify-center">
                         <span className="text-red-700 font-semibold">Complex Issues Debate</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Simulated AI Debate Simulator */}
+                  <div className={`bg-gradient-to-r from-gray-900 via-black to-gray-900 p-6 rounded-lg transition-all duration-300 ${
+                    currentStep === 6 ? 'ring-4 ring-purple-500 ring-opacity-50 animate-pulse' : ''
+                  }`}>
+                    <h4 className="font-serif font-bold mb-4 text-white text-center">🚀 AI Debate Simulator</h4>
+                    <div className="flex items-center justify-center space-x-4">
+                      {/* AI Side */}
+                      <div className="flex flex-col items-center text-white">
+                        <span className="text-2xl mb-1">🤖</span>
+                        <span className="text-xs font-serif">AI</span>
+                      </div>
+                      
+                      {/* VS Symbol */}
+                      <div className="flex flex-col items-center text-white">
+                        <span className="text-3xl mb-1 animate-bounce">⚔️</span>
+                        <span className="text-xs font-serif">VS</span>
+                      </div>
+                      
+                      {/* Human Side */}
+                      <div className="flex flex-col items-center text-white">
+                        <span className="text-2xl mb-1">👤</span>
+                        <span className="text-xs font-serif">HUMAN</span>
+                      </div>
+                    </div>
+                    <div className="text-center mt-3">
+                      <Button size="sm" className="bg-white text-black hover:bg-gray-100 text-xs">
+                        Start Epic Debate
+                      </Button>
                     </div>
                   </div>
 
