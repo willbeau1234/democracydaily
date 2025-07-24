@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Favicon Resizer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #007cba;
+            background: #f8f9fa;
+        }
+        .upload-area.dragover {
+            border-color: #007cba;
+            background: #e3f2fd;
+        }
+        #fileInput {
+            display: none;
+        }
+        .preview-section {
+            display: none;
+            margin: 30px 0;
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .preview-item {
+            text-align: center;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .preview-item h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+        }
+        .canvas-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: inline-block;
+        }
+        .preview-item canvas {
+            border: 1px solid #ccc;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        .download-btn {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        .download-btn:hover {
+            background: #005a87;
+        }
+        .download-all-btn {
+            background: #28a745;
+            font-size: 16px;
+            padding: 15px 30px;
+            margin: 20px 0;
+        }
+        .download-all-btn:hover {
+            background: #218838;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .instructions {
+            background: #e8f4fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #0056b3;
+        }
+        .file-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Favicon Resizer</h1>
+        <p class="subtitle">Upload your TDD favicon to create all three required sizes</p>
+        
+        <div class="instructions">
+            <h3>📋 What this tool does:</h3>
+            <p>Upload your current TDD favicon and I'll create three optimized versions:</p>
+            <ul>
+                <li><strong>16x16px</strong> - Standard browser tab favicon</li>
+                <li><strong>32x32px</strong> - High-resolution browser tab favicon</li>
+                <li><strong>180x180px</strong> - Apple touch icon for iOS devices</li>
+            </ul>
+        </div>
+
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <p style="font-size: 18px; margin: 0;">📁 Click here to upload your TDD favicon</p>
+            <p style="margin: 10px 0 0 0; color: #666;">Supports PNG, JPG, or any image format</p>
+        </div>
+        <input type="file" id="fileInput" accept="image/*">
+
+        <div class="preview-section" id="previewSection">
+            <h2 style="color: #333; border-bottom: 2px solid #007cba; padding-bottom: 10px;">Generated Favicon Files</h2>
+            
+            <div class="preview-grid">
+                <div class="preview-item">
+                    <h3>favicon-16x16.png</h3>
+                    <div class="canvas-container">
+                        <canvas id="canvas16" width="16" height="16"></canvas>
+                    </div>
+                    <div class="file-info">Size: 16x16px<br>Use: Browser tabs</div>
+                    <button class="download-btn" onclick="downloadCanvas('canvas16', 'favicon-16x16.png')">
+                        ⬇️ Download 16x16
+                    </button>
+                </div>
+                
+                <div class="preview-item">
+                    <h3>favicon-32x32.png</h3>
+                    <div class="canvas-container">
+                        <canvas id="canvas32" width="32" height="32"></canvas>
+                    </div>
+                    <div class="file-info">Size: 32x32px<br>Use: HD browser tabs</div>
+                    <button class="download-btn" onclick="downloadCanvas('canvas32', 'favicon-32x32.png')">
+                        ⬇️ Download 32x32
+                    </button>
+                </div>
+                
+                <div class="preview-item">
+                    <h3>apple-touch-icon.png</h3>
+                    <div class="canvas-container">
+                        <canvas id="canvas180" width="180" height="180"></canvas>
+                    </div>
+                    <div class="file-info">Size: 180x180px<br>Use: iOS home screen</div>
+                    <button class="download-btn" onclick="downloadCanvas('canvas180', 'apple-touch-icon.png')">
+                        ⬇️ Download 180x180
+                    </button>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <button class="download-btn download-all-btn" onclick="downloadAll()">
+                    📦 Download All Three Files
+                </button>
+            </div>
+
+            <div class="instructions">
+                <h3>📁 Next Steps:</h3>
+                <ol>
+                    <li>Download all three files</li>
+                    <li>Place them in your React app's <code>public/</code> folder</li>
+                    <li>Make sure your <code>public/index.html</code> has the favicon links</li>
+                    <li>Deploy your changes</li>
+                    <li>Clear browser cache or test in incognito mode</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.querySelector('.upload-area');
+        const previewSection = document.getElementById('previewSection');
+
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleImageUpload(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleImageUpload(e.target.files[0]);
+            }
+        });
+
+        function handleImageUpload(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    generateFavicons(img);
+                    previewSection.style.display = 'block';
+                    uploadArea.innerHTML = `
+                        <p style="font-size: 18px; margin: 0; color: #28a745;">✅ Image uploaded successfully!</p>
+                        <p style="margin: 10px 0 0 0; color: #666;">Click to upload a different image</p>
+                    `;
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function generateFavicons(sourceImg) {
+            const sizes = [
+                { size: 16, id: 'canvas16' },
+                { size: 32, id: 'canvas32' },
+                { size: 180, id: 'canvas180' }
+            ];
+            
+            sizes.forEach(({ size, id }) => {
+                const canvas = document.getElementById(id);
+                const ctx = canvas.getContext('2d');
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, size, size);
+                
+                // Set high-quality scaling for larger images
+                if (size >= 32) {
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                } else {
+                    // For very small sizes, sometimes nearest-neighbor works better
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'medium';
+                }
+                
+                // Draw resized image
+                ctx.drawImage(sourceImg, 0, 0, size, size);
+            });
+        }
+
+        function downloadCanvas(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            
+            // Create a temporary canvas to ensure proper PNG export
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            
+            // Copy the image data
+            tempCtx.drawImage(canvas, 0, 0);
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = tempCanvas.toDataURL('image/png');
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            console.log(`Downloaded: ${filename}`);
+        }
+
+        function downloadAll() {
+            const files = [
+                { id: 'canvas16', name: 'favicon-16x16.png' },
+                { id: 'canvas32', name: 'favicon-32x32.png' },
+                { id: 'canvas180', name: 'apple-touch-icon.png' }
+            ];
+            
+            files.forEach((file, index) => {
+                setTimeout(() => {
+                    downloadCanvas(file.id, file.name);
+                }, index * 300); // Stagger downloads
+            });
+        }
+    </script>
+</body>
+</html>
