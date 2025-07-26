@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 async function getOpinionData() {
   // Your existing data fetching logic here
   return {
-    opinionPiece: "Social media platforms should be required by law to verify the identity of all users before allowing them to create accounts. This would reduce cyberbullying, misinformation, and online harassment while creating a more accountable digital environment.",
+    opinionPiece: "Social media platforms should be required by law to verify the identity of all users before allowing them to create accounts. This would reduce cyberbullying, misinformation, and online harassment while creating a more accountable digital environment and more.",
     opinionStats: {
       totalResponses: 0,
       agreePercentage: 0,
