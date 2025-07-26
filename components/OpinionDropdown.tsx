@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface OpinionDropdownProps {
   className?: string;
@@ -14,6 +14,11 @@ export default function OpinionDropdown({
   currentPage = ""
 }: OpinionDropdownProps) {
   const [isOpinionDropdownOpen, setIsOpinionDropdownOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const getMenuItems = () => {
     const allItems = [
@@ -25,6 +30,16 @@ export default function OpinionDropdown({
 
     return allItems.filter(item => item.key !== currentPage);
   };
+
+  if (!isMounted) {
+    return (
+      <div className={`relative ${className}`}>
+        <span className="flex items-center gap-1 font-serif">
+          {sectionName}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className={`relative ${className}`}>

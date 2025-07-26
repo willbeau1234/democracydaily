@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   description: 'Where Your Voice Matters - Daily civic engagement through opinion discussions',
   icons: {
     icon: '/favicon.png',
+    apple: '/apple-touch-icon.png',
+    other: [
+      { rel: 'icon', url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { rel: 'icon', url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
   },
   verification: {
     google: 'xbrAok1TFMNTDTyAnWt6ynYeItRa5RSwAp-fAXt4B64',
