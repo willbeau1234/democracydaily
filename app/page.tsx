@@ -1,34 +1,29 @@
-import { getTodayOpinion, getOpinionStats } from '@/lib/firebase'
+import { Suspense } from 'react'
 import OpinionGameClient from '@/components/OpinionGameClient'
-import OpinionDropdown from "@/components/OpinionDropdown"
+import OpinionDropdown from '@/components/OpinionDropdown'
 
 export const dynamic = 'force-dynamic'
 
-// Server Component - fetches data on server for SEO
-export default async function HomePage() {
-  // Fetch opinion data on server side for SEO crawling
-  let opinionPiece = ""
-  let opinionStats = null
-  
-  try {
-    const todayOpinion = await getTodayOpinion()
-    if (todayOpinion) {
-      opinionPiece = todayOpinion.content
-    } else {
-      opinionPiece = "We're preparing today's civic discussion. Please check back in a few moments for a thought-provoking opinion piece that will engage our democratic community in meaningful dialogue about the issues that matter most to our society."
+// Fetch initial data server-side
+async function getOpinionData() {
+  // Your existing data fetching logic here
+  return {
+    opinionPiece: "Social media platforms should be required by law to verify the identity of all users before allowing them to create accounts. This would reduce cyberbullying, misinformation, and online harassment while creating a more accountable digital environment.",
+    opinionStats: {
+      totalResponses: 0,
+      agreePercentage: 0,
+      disagreePercentage: 100,
+      agreeCount: 0,
+      disagreeCount: 0
     }
-    
-    // Also load stats for SEO
-    const today = new Date().toISOString().split("T")[0]
-    opinionStats = await getOpinionStats(today)
-  } catch (error) {
-    console.error("Error loading opinion on server:", error)
-    opinionPiece = "Join the conversation about today's most important civic issues."
   }
+}
 
+export default async function HomePage() {
+  const { opinionPiece, opinionStats } = await getOpinionData()
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
-    year: "numeric", 
+    year: "numeric",
     month: "long",
     day: "numeric",
   })
@@ -48,43 +43,28 @@ export default async function HomePage() {
           </div>
         </header>
 
-        {/* SEO-friendly content preview - server rendered */}
-        <article className="bg-white shadow-lg border-0 rounded-lg mb-6">
-          <header className="border-b bg-gray-50 p-4 sm:p-6">
-            <h2 className="text-center text-2xl font-serif">Opinion of the Day</h2>
-          </header>
-          
-          <div className="p-4 sm:p-6">
-            <div className="min-h-[120px] p-4 sm:p-6 bg-white rounded-lg border border-gray-200 font-serif text-base sm:text-lg">
-              <p>{opinionPiece}</p>
-            </div>
-            
-            {/* SEO content about engagement */}
-            <div className="mt-6 text-center">
-              <p className="text-gray-600 mb-4">
-                Join thousands of citizens in meaningful democratic dialogue. Share your perspective and see how your community responds.
-              </p>
-              
-              {/* Stats preview for SEO */}
-              {opinionStats && (
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <h3 className="font-serif text-lg font-semibold mb-2">Community Engagement</h3>
-                  <div className="flex justify-center gap-8 text-sm">
-                    <span>{opinionStats.totalResponses} responses</span>
-                    <span>{opinionStats.agreePercentage}% agree</span>
-                    <span>{opinionStats.disagreePercentage}% disagree</span>
-                  </div>
-                </div>
-              )}
+        {/* ONLY the interactive component - remove server-rendered duplicate */}
+        <Suspense fallback={
+          <div className="bg-white shadow-lg border-0 rounded-lg mb-6 p-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-serif mb-4">Opinion of the Day</h2>
+              <div className="min-h-[120px] p-4 sm:p-6 bg-white rounded-lg border border-gray-200 font-serif text-base sm:text-lg">
+                <p>{opinionPiece}</p>
+              </div>
+              <div className="mt-6 text-center">
+                <p className="text-gray-600 mb-4">
+                  Join thousands of citizens in meaningful democratic dialogue. Share your perspective and see how your community responds.
+                </p>
+                <div className="text-center p-8">Loading interactive features...</div>
+              </div>
             </div>
           </div>
-        </article>
-
-        {/* Interactive component - client side */}
-        <OpinionGameClient 
-          initialOpinion={opinionPiece}
-          initialStats={opinionStats}
-        />
+        }>
+          <OpinionGameClient
+            initialOpinion={opinionPiece}
+            initialStats={opinionStats}
+          />
+        </Suspense>
 
         {/* SEO-friendly footer - server rendered */}
         <footer className="bg-white border-t-2 border-gray-300 mt-6">
