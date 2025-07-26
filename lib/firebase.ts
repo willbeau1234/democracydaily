@@ -590,16 +590,26 @@ export interface UserStreak {
   participationDates: string[] // Array of ISO date strings
 }
 
-// Get today's date in ISO format (YYYY-MM-DD)
+// Get today's date in Chicago timezone (YYYY-MM-DD)
 const getTodayDate = (): string => {
-  return new Date().toISOString().split('T')[0]
+  return new Date().toLocaleDateString('en-CA', { 
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
 }
 
-// Get yesterday's date in ISO format
+// Get yesterday's date in Chicago timezone
 const getYesterdayDate = (): string => {
   const yesterday = new Date()
   yesterday.setDate(yesterday.getDate() - 1)
-  return yesterday.toISOString().split('T')[0]
+  return yesterday.toLocaleDateString('en-CA', { 
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
 }
 
 // Check if a date is yesterday

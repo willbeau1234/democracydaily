@@ -308,8 +308,13 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stats, setStats] = useState<OpinionStats | null>(initialStats);
 
-  // Use real-time stats
-  const today = new Date().toISOString().split("T")[0];
+  // Use real-time stats with Chicago timezone
+  const today = new Date().toLocaleDateString('en-CA', { 
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
   const { stats: realtimeStats } = useRealTimeStats(today);
 
   // All your existing functions remain the same...
@@ -361,7 +366,12 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
       }
       
       const finalReasoning = reasoning.trim() || " ";
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString('en-CA', { 
+        timeZone: 'America/Chicago',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
       
       const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/submitResponse', {
         method: 'POST',
@@ -416,7 +426,12 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
 
   const loadStats = useCallback(async () => {
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString('en-CA', { 
+        timeZone: 'America/Chicago',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
       const opinionStats = await getOpinionStats(today);
       setStats(opinionStats);
     } catch (error) {

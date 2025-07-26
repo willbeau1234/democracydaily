@@ -259,7 +259,12 @@ function FriendsManager({ userId }: { userId: string }) {
         // Transform the data to include submission status
         const friendsWithStatus = await Promise.all(
           (data.friends || []).map(async (friend: any) => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA', { 
+              timeZone: 'America/Chicago',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
             
             // Check if friend has submitted today by looking for their response
             try {
