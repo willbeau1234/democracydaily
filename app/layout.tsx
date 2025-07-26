@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.png',
   },
+  verification: {
+    google: 'YOUR_GOOGLE_VERIFICATION_CODE_HERE',
+  },
 }
 
 export const viewport: Viewport = {

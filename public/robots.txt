@@ -1,3 +1,20 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /private
+Crawl-delay: 1
+
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /private
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /private
+
 Sitemap: https://thedemocracydaily.com/sitemap.xml
