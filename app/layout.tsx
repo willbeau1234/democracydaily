@@ -8,7 +8,10 @@ export const metadata: Metadata = {
     icon: '/favicon.png',
   },
   verification: {
-    google: 'YOUR_GOOGLE_VERIFICATION_CODE_HERE',
+    google: 'xbrAok1TFMNTDTyAnWt6ynYeItRa5RSwAp-fAXt4B64',
+  },
+  other: {
+    'google-adsense-account': 'ca-pub-4021281612777695',
   },
 }
 
@@ -26,6 +29,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script 
+          async 
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4021281612777695"
+          crossOrigin="anonymous"
+        ></script>
+      </head>
       <body>
         {children}
       </body>

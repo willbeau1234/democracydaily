@@ -1,4 +1,5 @@
-  'use client';
+
+"use client"
 
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -6,6 +7,7 @@ import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firesto
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { AuthUser, UserProfile, OpinionResponse } from '@/lib/types';
+export const dynamic = 'force-dynamic'
 
 // GitHub-style Calendar Component
 function OpinionCalendar({ userId }: { userId: string }) {
@@ -14,12 +16,20 @@ function OpinionCalendar({ userId }: { userId: string }) {
 
   // Get anonymous user ID (same logic as your opinion game)
   function getOrCreateUserId() {
-    let id = localStorage.getItem("anonUserId");
-    if (!id) {
-      // If no anonymous ID exists, we can't show calendar data
+    if (typeof window === 'undefined') {
       return null;
     }
-    return id;
+    try {
+      let id = localStorage.getItem("anonUserId");
+      if (!id) {
+        // If no anonymous ID exists, we can't show calendar data
+        return null;
+      }
+      return id;
+    } catch (error) {
+      console.error("Error accessing localStorage:", error);
+      return null;
+    }
   }
 
   useEffect(() => {
@@ -439,10 +449,13 @@ export default function ProfileView() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isClientMounted, setIsClientMounted] = useState(false);
 
   const router = useRouter();
 
   useEffect(() => {
+    setIsClientMounted(true);
+    
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         const authUser: AuthUser = {
@@ -483,6 +496,14 @@ export default function ProfileView() {
       setLoading(false);
     }
   };
+
+  if (!isClientMounted) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-xl">Loading...</div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
