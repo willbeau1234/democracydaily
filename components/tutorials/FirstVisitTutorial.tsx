@@ -55,7 +55,7 @@ export default function FirstVisitTutorial({ isVisible, onComplete, onSkip }: Fi
     {
       id: 'whats_next',
       title: 'What Happens Next? 🎉',
-      content: 'After submitting, you\'ll see the Community Pulse (voting results), live Word Clouds, and unlock our AI vs Human Debate Simulator. Let\'s get started!',
+      content: 'After submitting, you\'ll unlock exciting new features to explore the community discussion. Let\'s get started!',
       position: 'center'
     }
   ]

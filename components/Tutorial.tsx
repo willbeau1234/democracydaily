@@ -33,8 +33,8 @@ export default function Tutorial({ steps, isVisible, onComplete, onSkip, tutoria
       if (element) {
         const rect = element.getBoundingClientRect()
         setOverlay({
-          x: rect.left,
-          y: rect.top,
+          x: rect.left + window.scrollX,
+          y: rect.top + window.scrollY,
           width: rect.width,
           height: rect.height
         })
@@ -90,7 +90,7 @@ export default function Tutorial({ steps, isVisible, onComplete, onSkip, tutoria
       {/* Spotlight effect for target elements */}
       {overlay && (
         <div
-          className="fixed z-50 pointer-events-none"
+          className="absolute z-50 pointer-events-none"
           style={{
             left: overlay.x - 4,
             top: overlay.y - 4,
