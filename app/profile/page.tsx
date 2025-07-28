@@ -1,28 +1,8 @@
-import { redirect } from 'next/navigation';
-import { getServerSideUser, getServerSideUserProfile, getServerSideUserSummary, getServerSideFriends, getServerSidePendingRequests } from '@/lib/server-auth';
-import ProfileServer from './ProfileServer';
+import { Suspense } from 'react';
+import ProfileClient from './ProfileClient';
 import OpinionDropdown from '@/components/OpinionDropdown';
 
-export default async function ProfilePage() {
-  // Get authenticated user server-side
-  const user = await getServerSideUser();
-  
-  if (!user) {
-    redirect('/');
-  }
-
-  // Fetch all profile data server-side
-  const [profile, userSummary, friends, pendingRequests] = await Promise.all([
-    getServerSideUserProfile(user.uid),
-    getServerSideUserSummary(user.uid),
-    getServerSideFriends(user.uid),
-    getServerSidePendingRequests(user.uid)
-  ]);
-
-  if (!profile) {
-    redirect('/create-profile');
-  }
-
+export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-100 py-4 sm:py-8 px-3 sm:px-4">
       <div className="max-w-4xl mx-auto">
@@ -46,14 +26,19 @@ export default async function ProfilePage() {
           </div>
         </div>
 
-        {/* Server-side rendered profile content */}
-        <ProfileServer 
-          user={user}
-          profile={profile}
-          userSummary={userSummary}
-          friends={friends}
-          pendingRequests={pendingRequests}
-        />
+        {/* Client-side profile content */}
+        <Suspense fallback={
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="text-center">
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-1/3 mx-auto mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+              </div>
+            </div>
+          </div>
+        }>
+          <ProfileClient />
+        </Suspense>
       </div>
     </div>
   );

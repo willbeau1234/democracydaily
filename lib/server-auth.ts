@@ -1,47 +1,12 @@
-import { cookies } from 'next/headers';
 import { AuthUser, UserProfile } from './types';
 
-// Firebase Admin SDK types (we'll import these when admin SDK is available)
-interface FirebaseUser {
-  uid: string;
-  email?: string;
-  name?: string;
-}
-
-// Helper to get authenticated user from server-side
+// Temporary fallback - return null to force client-side auth
+// This will redirect users to login on client-side
 export async function getServerSideUser(): Promise<AuthUser | null> {
-  try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('session');
-    
-    if (!sessionToken?.value) {
-      return null;
-    }
-
-    // Verify the session token with Firebase Cloud Function
-    const response = await fetch('https://us-central1-thedailydemocracy-37e55.cloudfunctions.net/verifySession', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionToken.value}`
-      }
-    });
-
-    const result = await response.json();
-    
-    if (result.success && result.user) {
-      return {
-        uid: result.user.uid,
-        email: result.user.email,
-        displayName: result.user.displayName
-      };
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error verifying server-side session:', error);
-    return null;
-  }
+  // For now, return null to force client-side authentication
+  // This means the profile page will redirect to home page on server-side
+  // but will work properly once client-side auth kicks in
+  return null;
 }
 
 // Get user profile from server-side

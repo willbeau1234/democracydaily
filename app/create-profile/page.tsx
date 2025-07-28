@@ -1,22 +1,7 @@
-import { redirect } from 'next/navigation';
-import { getServerSideUser, getServerSideUserProfile } from '@/lib/server-auth';
-import CreateProfileServer from './CreateProfileServer';
+import { Suspense } from 'react';
+import CreateProfileClient from './CreateProfileClient';
 
-export default async function CreateProfilePage() {
-  // Get authenticated user server-side
-  const user = await getServerSideUser();
-  
-  if (!user) {
-    redirect('/');
-  }
-
-  // Check if profile already exists
-  const existingProfile = await getServerSideUserProfile(user.uid);
-  
-  if (existingProfile) {
-    redirect('/profile');
-  }
-
+export default function CreateProfilePage() {
   return (
     <div className="min-h-screen bg-gray-100 py-4 sm:py-8 px-3 sm:px-4">
       <div className="max-w-2xl mx-auto">
@@ -26,8 +11,21 @@ export default async function CreateProfilePage() {
           <p className="text-gray-600 mt-2">Create Your Political Profile</p>
         </div>
 
-        {/* Server-side rendered profile creation form */}
-        <CreateProfileServer user={user} />
+        {/* Client-side profile creation form */}
+        <Suspense fallback={
+          <div className="bg-white rounded-lg shadow-lg p-4 sm:p-8">
+            <div className="text-center">
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-1/2 mx-auto mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-8"></div>
+                <div className="h-12 bg-gray-200 rounded w-full mb-4"></div>
+                <div className="h-12 bg-gray-200 rounded w-full"></div>
+              </div>
+            </div>
+          </div>
+        }>
+          <CreateProfileClient />
+        </Suspense>
       </div>
     </div>
   );
