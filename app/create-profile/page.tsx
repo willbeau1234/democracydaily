@@ -16,6 +16,7 @@ export default function CreateProfile() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
   
   // ✅ MINIMAL FORM DATA STATE - just display name
@@ -23,9 +24,14 @@ export default function CreateProfile() {
     displayName: ''
   });
 
-  // Remove interests array - not needed anymore
+  // SSR Guard - only run auth logic on client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   useEffect(() => {
+    if (!isClient) return;
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
@@ -35,12 +41,15 @@ export default function CreateProfile() {
         }));
         setLoading(false);
       } else {
-        router.push('/'); // Redirect to main page if not signed in
+        // Only redirect on client-side
+        if (typeof window !== 'undefined') {
+          router.push('/');
+        }
       }
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, isClient]);
 
   const handleSubmit = async () => {
     if (!user) {
@@ -79,7 +88,7 @@ export default function CreateProfile() {
 
   // No longer need toggleInterest function
 
-  if (loading) {
+  if (!isClient || loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-xl">Loading...</div>

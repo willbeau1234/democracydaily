@@ -500,7 +500,7 @@ function OpinionCalendar({ authUserId }: { authUserId: string }) {
         console.log('⚠️ No user summary found, trying fallback method...');
         
         // Fallback: Get anonymous user ID and fetch responses directly
-        const anonUserId = localStorage.getItem("anonUserId");
+        const anonUserId = typeof window !== 'undefined' ? localStorage.getItem("anonUserId") : null;
         if (anonUserId) {
           console.log('🔄 Falling back to anonymous user ID:', anonUserId);
           
@@ -976,10 +976,18 @@ export default function ProfileView() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
 
   const router = useRouter();
 
+  // SSR Guard - only run auth logic on client
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         const authUser: AuthUser = {
@@ -991,12 +999,15 @@ export default function ProfileView() {
         setUser(authUser);
         await fetchProfile(currentUser.uid);
       } else {
-        router.push('/');
+        // Only redirect on client-side
+        if (typeof window !== 'undefined') {
+          router.push('/');
+        }
       }
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, isClient]);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -1021,7 +1032,8 @@ export default function ProfileView() {
     }
   };
 
-  if (loading) {
+  // Show loading during SSR or while auth is loading
+  if (!isClient || loading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-xl">Loading your profile...</div>
