@@ -28,6 +28,9 @@ import { AuthUser , OpinionResponse } from '@/lib/types';
 import AIvsHumanButton from '@/components/AIvsHumanButton';
 import { useRealTimeStats, useRealTimeWordCloud, useRealTimeVotes } from '@/hooks/useFirebase'
 import OpinionDropdown from "@/components/OpinionDropdown"
+import { useTutorial } from '@/hooks/useTutorial'
+import FirstVisitTutorial from '@/components/tutorials/FirstVisitTutorial'
+import PostSubmissionTutorial from '@/components/tutorials/PostSubmissionTutorial'
 
 interface OpinionGameClientProps {
   initialOpinion: string;
@@ -250,7 +253,7 @@ const DynamicWordCloud: React.FC<DynamicWordCloudProps> = ({ opinionId, stance }
   }, [wordData]);
 
   return (
-    <div className="border rounded-lg p-3 sm:p-4 bg-white">
+    <div className="border rounded-lg p-3 sm:p-4 bg-white" data-tutorial={stance === 'agree' ? 'agree-cloud' : 'disagree-cloud'}>
       <div className="flex items-center justify-between mb-3">
         <h4 className="font-serif text-base sm:text-lg font-semibold">
           {stance === 'agree' ? '✅ Agree' : '❌ Disagree'} Word Cloud
@@ -294,6 +297,16 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [karaokeSpeed, setKaraokeSpeed] = useState(1)
   const [shouldSkip, setShouldSkip] = useState(false)
+  
+  // Tutorial system
+  const {
+    tutorialState,
+    startTutorial,
+    completeTutorial,
+    skipTutorial,
+    checkAndStartAppropriateDemo,
+    markUserAsVisited
+  } = useTutorial()
   const [opinionPiece, setOpinionPiece] = useState(initialOpinion)
   const [loadingOpinion, setLoadingOpinion] = useState(false) // No longer loading since we have initial data
   const [isFeedbackSent, setIsFeedbackSent] = useState(false);
@@ -707,6 +720,9 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
 
       // Check daily submission status
       checkDailySubmissionStatus();
+      
+      // Mark user as visited for tutorial tracking
+      markUserAsVisited();
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -749,6 +765,23 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
       loadStats();
     }
   }, [isAnimationComplete]);
+
+  // Tutorial trigger effects
+  useEffect(() => {
+    if (hasClicked && isClientMounted) {
+      // Check for first visit tutorial
+      checkAndStartAppropriateDemo();
+    }
+  }, [hasClicked, isClientMounted]);
+
+  // Trigger post-submission tutorial
+  useEffect(() => {
+    if (hasSubmitted && isClientMounted) {
+      setTimeout(() => {
+        startTutorial('post_submission');
+      }, 1000);
+    }
+  }, [hasSubmitted, isClientMounted]);
 
   const displayStats = realtimeStats || stats;
 
@@ -797,7 +830,7 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
 
               {!hasSubmitted ? (
                 <>
-                  <div className="min-h-[120px] p-4 sm:p-6 bg-white rounded-lg border border-gray-200 font-serif text-base sm:text-lg">
+                  <div className="min-h-[120px] p-4 sm:p-6 bg-white rounded-lg border border-gray-200 font-serif text-base sm:text-lg" data-tutorial="opinion-text">
                     <KaraokeText
                       text={opinionPiece}
                       onComplete={handleAnimationComplete}
@@ -829,7 +862,7 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
 
                   {isAnimationComplete && (
                     <>
-                      <div className="flex justify-center gap-3 sm:gap-4 mt-6">
+                      <div className="flex justify-center gap-3 sm:gap-4 mt-6" data-tutorial="voting-buttons">
                         <Button
                           variant={selectedOption === "agree" ? "default" : "outline"}
                           onClick={() => setSelectedOption("agree")}
@@ -855,6 +888,7 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
                             onChange={(e) => setReasoning(e.target.value)}
                             rows={4}
                             className="font-serif"
+                            data-tutorial="reasoning-textarea"
                           />
                         </div>
                       )}
@@ -886,7 +920,7 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
                           <p className="text-xs text-gray-600 font-serif">Spread the democratic discussion</p>
                         </div>
                         
-                        <div className="flex flex-wrap justify-center gap-2">
+                        <div className="flex flex-wrap justify-center gap-2" data-tutorial="sharing-buttons">
                           {/* Facebook */}
                           <button
                             onClick={shareToFacebook}
@@ -948,7 +982,7 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
 
                   {/* Stats and word clouds */}
                   {displayStats && (
-                    <div className="border rounded-lg p-4 sm:p-6 bg-gray-50">
+                    <div className="border rounded-lg p-4 sm:p-6 bg-gray-50" data-tutorial="community-pulse">
                       <h3 className="font-serif text-xl font-bold mb-4 text-center">Community Pulse</h3>
                       <div className="mb-4">
                         <div className="flex h-8 rounded-lg overflow-hidden border-2 border-gray-300">
@@ -975,7 +1009,7 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
                   )}
 
                   {/* Dynamic Word Clouds */}
-                  <div className="space-y-4">
+                  <div className="space-y-4" data-tutorial="word-clouds">
                     <h3 className="font-serif text-xl font-bold text-center">Live Word Clouds</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       <DynamicWordCloud opinionId={today} stance="agree" />
@@ -992,6 +1026,7 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
                   onClick={handleSubmit}
                   disabled={!selectedOption || !isAnimationComplete || isSubmitting}
                   className="bg-gray-900 hover:bg-black"
+                  data-tutorial="submit-button"
                 >
                   {isSubmitting ? "Submitting..." : "Submit Your Opinion"}
                 </Button>
@@ -1040,7 +1075,7 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
                     </p>
                   </div>
                   
-                  <div className="flex justify-center">
+                  <div className="flex justify-center" data-tutorial="ai-debate-button">
                     <AIvsHumanButton 
                       personOpinion={reasoning} 
                       opinionOfTheDay={opinionPiece} 
@@ -1054,6 +1089,19 @@ export default function OpinionGameClient({ initialOpinion, initialStats }: Opin
       )}
 
       <Toaster />
+
+      {/* Tutorial Components */}
+      <FirstVisitTutorial
+        isVisible={tutorialState.isVisible && tutorialState.currentTutorial === 'first_visit'}
+        onComplete={completeTutorial}
+        onSkip={skipTutorial}
+      />
+      
+      <PostSubmissionTutorial
+        isVisible={tutorialState.isVisible && tutorialState.currentTutorial === 'post_submission'}
+        onComplete={completeTutorial}
+        onSkip={skipTutorial}
+      />
     </>
   )
 }

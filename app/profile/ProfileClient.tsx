@@ -9,6 +9,7 @@ import { AuthUser, UserProfile, OpinionResponse } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Camera, Upload, Save, Check, X, Users, Bell, UserCheck } from "lucide-react";
+import FireEmoji from '@/components/Fire';
 
 // User Summary Interface
 interface UserSummary {
@@ -147,27 +148,27 @@ function FriendRequestsManager({ userId }: { userId: string }) {
 
   if (loading) {
     return (
-      <div className="border rounded-lg p-6 bg-white">
-        <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5" />
+      <div className="bg-white border-4 border-black shadow-xl p-6 mb-8">
+        <h2 className="text-2xl font-bold font-mono mb-6 flex items-center gap-3 border-b-4 border-black pb-4 uppercase tracking-wide">
+          <Users className="w-6 h-6" />
           Friend Requests
-        </h4>
-        <div className="text-gray-500">Loading friend requests...</div>
+        </h2>
+        <div className="text-gray-600 font-mono text-center py-6 bg-gray-50 border-2 border-gray-300 rounded">🔄 Loading friend requests...</div>
       </div>
     );
   }
 
   return (
-    <div className="border rounded-lg p-6 bg-white">
-      <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        <Users className="w-5 h-5" />
+    <div className="bg-white border-4 border-black shadow-xl p-6 mb-8">
+      <h2 className="text-2xl font-bold font-mono mb-6 flex items-center gap-3 border-b-4 border-black pb-4 uppercase tracking-wide">
+        <Users className="w-6 h-6" />
         Friend Requests
         {pendingRequests.length > 0 && (
-          <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+          <span className="bg-black text-white text-sm px-3 py-1 border-2 border-black font-mono font-bold">
             {pendingRequests.length}
           </span>
         )}
-      </h4>
+      </h2>
       
       {pendingRequests.length === 0 ? (
         <div className="text-gray-500 text-center py-4">
@@ -359,27 +360,27 @@ function FriendsManager({ userId }: { userId: string }) {
 
   if (loading) {
     return (
-      <div className="border rounded-lg p-6 bg-white">
-        <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <UserCheck className="w-5 h-5" />
+      <div className="bg-white border-4 border-black shadow-xl p-6 mb-8">
+        <h2 className="text-2xl font-bold font-mono mb-6 flex items-center gap-3 border-b-4 border-black pb-4 uppercase tracking-wide">
+          <UserCheck className="w-6 h-6" />
           Your Friends
-        </h4>
-        <div className="text-gray-500">Loading your friends...</div>
+        </h2>
+        <div className="text-gray-600 font-mono text-center py-6 bg-gray-50 border-2 border-gray-300 rounded">🔄 Loading your friends...</div>
       </div>
     );
   }
 
   return (
-    <div className="border rounded-lg p-6 bg-white">
-      <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        <UserCheck className="w-5 h-5" />
+    <div className="bg-white border-4 border-black shadow-xl p-6 mb-8">
+      <h2 className="text-2xl font-bold font-mono mb-6 flex items-center gap-3 border-b-4 border-black pb-4 uppercase tracking-wide">
+        <UserCheck className="w-6 h-6" />
         Your Friends
         {friends.length > 0 && (
-          <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+          <span className="bg-black text-white text-sm px-3 py-1 border-2 border-black font-mono font-bold">
             {friends.length}
           </span>
         )}
-      </h4>
+      </h2>
       
       {friends.length === 0 ? (
         <div className="text-gray-500 text-center py-4">
@@ -451,7 +452,7 @@ function FriendsManager({ userId }: { userId: string }) {
 }
 
 // GitHub-style Calendar Component
-function OpinionCalendar({ authUserId }: { authUserId: string }) {
+function OpinionCalendar({ authUserId, profile }: { authUserId: string, profile: UserProfile | null }) {
   const [responses, setResponses] = useState<OpinionResponse[]>([]);
   const [userSummary, setUserSummary] = useState<UserSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -638,14 +639,13 @@ function OpinionCalendar({ authUserId }: { authUserId: string }) {
     }
   };
 
-  // Generate calendar data for the last 3 months (most readable)
+  // Generate calendar data for the full year (January 1st to today)
   const generateCalendarData = () => {
     const today = new Date();
-    const threeMonthsAgo = new Date(today);
-    threeMonthsAgo.setMonth(today.getMonth() - 3);
+    const startOfYear = new Date(today.getFullYear(), 0, 1); // January 1st of current year
     
     const days = [];
-    const current = new Date(threeMonthsAgo);
+    const current = new Date(startOfYear);
     
     // Create a map of date strings to responses for faster lookup
     const responsesByDate = new Map<string, OpinionResponse[]>();
@@ -790,16 +790,16 @@ function OpinionCalendar({ authUserId }: { authUserId: string }) {
 
   if (loading) {
     return (
-      <div className="border rounded-lg p-6 bg-white">
-        <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity</h4>
-        <div className="text-gray-500">Loading your activity...</div>
+      <div className="bg-white border-4 border-black shadow-xl p-6 mb-8">
+        <h2 className="text-2xl font-bold font-mono mb-6 border-b-4 border-black pb-4 uppercase tracking-wide">📅 Opinion Activity Dashboard</h2>
+        <div className="text-gray-600 font-mono text-center py-8 bg-gray-50 border-2 border-gray-300 rounded">🔄 Loading your activity...</div>
       </div>
     );
   }
 
   return (
-    <div className="border rounded-lg p-6 bg-white">
-      <h4 className="text-lg font-semibold mb-4">📅 Opinion Activity (Last 3 Months)</h4>
+    <div className="bg-white border-4 border-black shadow-xl p-6 mb-8">
+      <h2 className="text-2xl font-bold font-mono mb-6 border-b-4 border-black pb-4 uppercase tracking-wide">📅 Opinion Activity Dashboard</h2>
       
       {/* Debug Info */}
       {userSummary && (
@@ -830,90 +830,162 @@ function OpinionCalendar({ authUserId }: { authUserId: string }) {
           </ul>
         </div>
       )}
-      
-      {/* Stats */}
-      <div className="mb-4 flex flex-wrap gap-6 text-sm text-gray-600">
-        <div>
-          <strong>{totalResponses}</strong> opinions shared
+
+      {/* Friend Requests Section - Above Fire Emoji */}
+      <div className="mb-8">
+        <FriendRequestsManager userId={authUserId} />
+      </div>
+
+      {/* Friends Section - Above Fire Emoji */}
+      <div className="mb-8">
+        <FriendsManager userId={authUserId} />
+      </div>
+
+      {/* Account Stats Section - Above Fire Emoji */}
+      <div className="mb-8">
+        <div className="bg-white border-4 border-black shadow-xl p-6">
+          <h2 className="text-2xl font-bold font-mono mb-6 flex items-center gap-3 border-b-4 border-black pb-4 uppercase tracking-wide">
+            📊 Account Stats
+          </h2>
+          {profile && (
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-white border-2 border-gray-300 p-4 rounded-lg shadow-sm">
+                <h3 className="text-lg font-bold font-mono text-gray-800 border-b-2 border-black pb-2 mb-4 uppercase">
+                  📊 Account History
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between p-2 bg-gray-50 border border-gray-200 rounded">
+                    <span className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Created:</span>
+                    <span className="font-mono text-gray-900 text-sm">
+                      {profile.createdAt ? 
+                        new Date(profile.createdAt.seconds * 1000).toLocaleDateString() : 
+                        'Recently'
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-gray-50 border border-gray-200 rounded">
+                    <span className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Updated:</span>
+                    <span className="font-mono text-gray-900 text-sm">
+                      {profile.updatedAt ? 
+                        new Date(profile.updatedAt.seconds * 1000).toLocaleDateString() : 
+                        'Not updated'
+                      }
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white border-2 border-gray-300 p-4 rounded-lg shadow-sm">
+                <h3 className="text-lg font-bold font-mono text-gray-800 border-b-2 border-black pb-2 mb-4 uppercase">
+                  📊 Account Status
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between p-2 bg-gray-50 border border-gray-200 rounded">
+                    <span className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Status:</span>
+                    <span className={`px-2 py-1 border-2 text-xs font-bold font-mono ${
+                      profile.profileComplete 
+                        ? 'bg-green-100 text-green-800 border-green-400' 
+                        : 'bg-yellow-100 text-yellow-800 border-yellow-400'
+                    }`}>
+                      {profile.profileComplete ? '✓ COMPLETE' : '⚠ INCOMPLETE'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-        <div>
-          <strong>{currentStreak}</strong> day current streak
-        </div>
-        <div>
-          <strong>{agreeCount}</strong> agree, <strong>{disagreeCount}</strong> disagree
-        </div>
-        {averageLength > 0 && (
-          <div>
-            <strong>{averageLength}</strong> avg characters per response
-          </div>
-        )}
       </div>
       
-      {/* Calendar Grid */}
-      <div className="mb-4 overflow-x-auto">
-        <div className="flex gap-1">
-          {/* Day labels */}
-          <div className="flex flex-col gap-1 text-xs text-gray-500 mr-2">
-            <div className="w-3 h-4"></div> {/* Spacer for month labels */}
-            {dayLabels.map((label, index) => (
-              <div key={label} className="w-3 h-3 flex items-center text-xs">
-                {index % 2 === 1 ? label.slice(0, 1) : ''}
-              </div>
-            ))}
+      {/* Stats - NYT Games Style */}
+      <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white border-2 border-gray-300 p-4 text-center rounded-lg shadow-sm">
+          <div className="text-3xl font-bold text-gray-800 font-mono">{totalResponses}</div>
+          <div className="text-xs text-gray-600 uppercase tracking-wider font-semibold">Opinions</div>
+        </div>
+        <div className="bg-white border-2 border-gray-300 p-4 text-center rounded-lg shadow-sm">
+          <div className="text-2xl font-bold text-green-600 font-mono">{agreeCount}</div>
+          <div className="text-xs text-gray-600 uppercase tracking-wider font-semibold">Agree</div>
+        </div>
+        <div className="bg-white border-2 border-gray-300 p-4 text-center rounded-lg shadow-sm">
+          <div className="text-2xl font-bold text-red-600 font-mono">{disagreeCount}</div>
+          <div className="text-xs text-gray-600 uppercase tracking-wider font-semibold">Disagree</div>
+        </div>
+        <div className="bg-white border-2 border-gray-300 p-4 text-center rounded-lg shadow-sm">
+          <div className="flex items-center justify-center mb-2">
+            {currentStreak > 0 && <FireEmoji />}
           </div>
-          
-          {/* Calendar container with month labels */}
-          <div className="relative">
-            {/* Month labels */}
-            <div className="flex gap-1 mb-1 h-4">
-              {monthLabels.map((monthLabel, index) => (
-                <div
-                  key={`${monthLabel.month}-${index}`}
-                  className="text-xs text-gray-600 font-medium"
-                  style={{ 
-                    position: 'absolute',
-                    left: `${monthLabel.weekIndex * 16}px`, // 16px = w-3 (12px) + gap-1 (4px)
-                    top: '0px'
-                  }}
-                >
-                  {monthLabel.month}
+          <div className="text-3xl font-bold text-orange-600 font-mono">{currentStreak}</div>
+          <div className="text-xs text-gray-600 uppercase tracking-wider font-semibold">Day Streak</div>
+        </div>
+      </div>
+      
+      {/* Calendar Grid - Bigger NYT Style */}
+      <div className="mb-6 p-4 bg-gray-50 border-2 border-gray-300 rounded-lg">
+        <div className="overflow-x-auto">
+          <div className="flex gap-2">
+            {/* Day labels */}
+            <div className="flex flex-col gap-2 text-sm text-gray-600 mr-3 font-semibold">
+              <div className="w-6 h-6"></div> {/* Spacer for month labels */}
+              {dayLabels.map((label, index) => (
+                <div key={label} className="w-6 h-6 flex items-center justify-center text-xs">
+                  {index % 2 === 1 ? label.slice(0, 1) : ''}
                 </div>
               ))}
             </div>
             
-            {/* Calendar squares */}
-            <div className="grid grid-rows-7 grid-flow-col gap-1">
-              {displayGrid.map((row, rowIndex) => (
-                row.map((day, colIndex) => (
+            {/* Calendar container with month labels */}
+            <div className="relative">
+              {/* Month labels */}
+              <div className="flex gap-2 mb-2 h-6">
+                {monthLabels.map((monthLabel, index) => (
                   <div
-                    key={`${rowIndex}-${colIndex}`}
-                    className={`w-3 h-3 rounded-sm border border-gray-200 hover:ring-1 hover:ring-blue-300 cursor-pointer ${
-                      day ? getIntensityClass(day.intensity) : 'bg-gray-50'
-                    }`}
-                    title={day ? `${day.date.toLocaleDateString()}: ${
-                      day.hasParticipated
-                        ? `Participated (${day.stance || 'unknown stance'})${day.allResponses && day.allResponses.length > 0 ? ` - ${day.allResponses.length} detailed response(s)` : ''}`
-                        : 'No participation'
-                    }` : ''}
-                  />
-                ))
-              ))}
+                    key={`${monthLabel.month}-${index}`}
+                    className="text-sm text-gray-700 font-bold"
+                    style={{ 
+                      position: 'absolute',
+                      left: `${monthLabel.weekIndex * 32}px`, // 32px = w-6 (24px) + gap-2 (8px)
+                      top: '0px'
+                    }}
+                  >
+                    {monthLabel.month}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Calendar squares - Bigger */}
+              <div className="grid grid-rows-7 grid-flow-col gap-2">
+                {displayGrid.map((row, rowIndex) => (
+                  row.map((day, colIndex) => (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      className={`w-6 h-6 rounded border-2 hover:ring-2 hover:ring-blue-400 cursor-pointer transition-all duration-200 ${
+                        day ? getIntensityClass(day.intensity) + ' border-gray-400' : 'bg-gray-100 border-gray-300'
+                      }`}
+                      title={day ? `${day.date.toLocaleDateString()}: ${
+                        day.hasParticipated
+                          ? `Participated (${day.stance || 'unknown stance'})${day.allResponses && day.allResponses.length > 0 ? ` - ${day.allResponses.length} detailed response(s)` : ''}`
+                          : 'No participation'
+                      }` : ''}
+                    />
+                  ))
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Legend */}
-      <div className="flex items-center justify-between text-xs text-gray-600">
-        <span>Less active</span>
-        <div className="flex gap-1">
-          <div className="w-4 h-4 bg-gray-100 border border-gray-200 rounded-sm"></div>
-          <div className="w-4 h-4 bg-green-200 border border-gray-200 rounded-sm"></div>
-          <div className="w-4 h-4 bg-green-300 border border-gray-200 rounded-sm"></div>
-          <div className="w-4 h-4 bg-green-500 border border-gray-200 rounded-sm"></div>
-          <div className="w-4 h-4 bg-green-700 border border-gray-200 rounded-sm"></div>
+      {/* Legend - NYT Style */}
+      <div className="flex items-center justify-between text-sm text-gray-700 bg-white p-3 border-2 border-gray-300 rounded-lg">
+        <span className="font-semibold">Less active</span>
+        <div className="flex gap-2">
+          <div className="w-5 h-5 bg-gray-100 border-2 border-gray-300 rounded"></div>
+          <div className="w-5 h-5 bg-green-200 border-2 border-gray-400 rounded"></div>
+          <div className="w-5 h-5 bg-green-300 border-2 border-gray-400 rounded"></div>
+          <div className="w-5 h-5 bg-green-500 border-2 border-gray-400 rounded"></div>
+          <div className="w-5 h-5 bg-green-700 border-2 border-gray-400 rounded"></div>
         </div>
-        <span>More active</span>
+        <span className="font-semibold">More active</span>
       </div>
 
       {/* Optional Profile Photo Section - Smaller and Less Prominent */}
@@ -1056,114 +1128,69 @@ export default function ProfileClient() {
   }
 
   return (
-    <>
-      {/* Profile Content */}
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
-        {/* Profile Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-3xl font-bold">{profile.displayName}</h2>
-              <p className="text-blue-100 text-lg">{profile.email}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-blue-100 text-sm">Member since</p>
-              <p className="text-white">
-                {profile.createdAt ? 
-                  new Date(profile.createdAt.seconds * 1000).toLocaleDateString() : 
-                  'Recently'
-                }
-              </p>
+    <div className="min-h-screen bg-gray-100 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Profile Content - NYT Games Style */}
+        <div className="bg-white border-4 border-black shadow-xl mb-8">
+          {/* Profile Header - Clean NYT Style */}
+          <div className="bg-white border-b-4 border-black p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-4xl font-bold font-mono tracking-tight text-black uppercase">{profile.displayName}</h1>
+                <p className="text-gray-600 text-lg font-mono mt-1">{profile.email}</p>
+              </div>
+              <div className="text-right bg-gray-100 border-2 border-gray-300 p-3 rounded">
+                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Member since</p>
+                <p className="text-black font-mono font-bold">
+                  {profile.createdAt ? 
+                    new Date(profile.createdAt.seconds * 1000).toLocaleDateString() : 
+                    'Recently'
+                  }
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Profile Body */}
-        <div className="p-6">
-          <div className="space-y-6">
-            <div className="border-b pb-4">
-              <h3 className="text-2xl font-bold">Profile Information</h3>
-            </div>
+          {/* Profile Body - NYT Games Grid Style */}
+          <div className="p-6 bg-gray-50">
+            <div className="space-y-6">
+              <div className="border-b-4 border-black pb-4">
+                <h2 className="text-2xl font-bold font-mono uppercase tracking-wide">Account Dashboard</h2>
+              </div>
 
-            <div className="grid md:grid-cols-2 gap-8">
               {/* Basic Info */}
-              <div className="space-y-4">
-                <h4 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
-                  Account Details
-                </h4>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Display Name</label>
-                  <p className="text-lg text-gray-900">{profile.displayName}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Email</label>
-                  <p className="text-lg text-gray-900">{profile.email}</p>
-                </div>
-              </div>
-
-              {/* Account History */}
-              <div className="space-y-4">
-                <h4 className="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
-                  Account History
-                </h4>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Profile Created</label>
-                  <p className="text-lg text-gray-900">
-                    {profile.createdAt ? 
-                      new Date(profile.createdAt.seconds * 1000).toLocaleDateString() : 
-                      'Recently'
-                    }
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Last Updated</label>
-                  <p className="text-lg text-gray-900">
-                    {profile.updatedAt ? 
-                      new Date(profile.updatedAt.seconds * 1000).toLocaleDateString() : 
-                      'Not updated yet'
-                    }
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Profile Status</label>
-                  <p className="text-lg text-gray-900">
-                    <span className={`px-3 py-1 rounded-full text-sm ${
-                      profile.profileComplete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {profile.profileComplete ? 'Complete' : 'Incomplete'}
-                    </span>
-                  </p>
+              <div className="bg-white border-2 border-gray-300 p-4 rounded-lg shadow-sm max-w-md mx-auto">
+                <h3 className="text-lg font-bold font-mono text-gray-800 border-b-2 border-black pb-2 mb-4 uppercase">
+                  📋 Account Details
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between p-2 bg-gray-50 border border-gray-200 rounded">
+                    <span className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Name:</span>
+                    <span className="font-mono text-gray-900">{profile.displayName}</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-gray-50 border border-gray-200 rounded">
+                    <span className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Email:</span>
+                    <span className="font-mono text-gray-900 text-sm">{profile.email}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Friend Requests Section */}
-      <div className="mb-8">
-        <FriendRequestsManager userId={user.uid} />
-      </div>
+        {/* Opinion Activity Calendar */}
+        <OpinionCalendar authUserId={user.uid} profile={profile} />
 
-      {/* Friends Section */}
-      <div className="mb-8">
-        <FriendsManager userId={user.uid} />
-      </div>
-
-      {/* Opinion Activity Calendar */}
-      <OpinionCalendar authUserId={user.uid} />
-
-      {/* Navigation Buttons */}
-      <div className="mt-8 border-t pt-6">
-        <div className="flex justify-center">
+        {/* Navigation - NYT Style */}
+        <div className="mt-8 bg-white border-4 border-black p-6 text-center">
           <button 
             onClick={() => router.push('/')}
-            className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors"
+            className="bg-black text-white px-8 py-4 border-2 border-black hover:bg-white hover:text-black transition-all duration-200 font-mono font-bold text-lg uppercase tracking-wider"
           >
-            🏠 Back to Main Page
+            🏠 Return to Democracy Daily
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
 }

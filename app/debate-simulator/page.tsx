@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress"
 import { Clock, Users, Trophy, MessageSquare, Send } from "lucide-react"
 import { generateDebateResponse } from "./actions"  // ← Removed Server Action import
 import { useRouter } from "next/navigation"
+import { useTutorial } from '@/hooks/useTutorial'
+import DebateSimulatorTutorial from '@/components/tutorials/DebateSimulatorTutorial'
 
 
 type Persona = "pro" | "con" | "moderator" | "judge"
@@ -123,6 +125,15 @@ function VirtualDebateSimulationContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   
+  // Tutorial system
+  const {
+    tutorialState,
+    startTutorial,
+    completeTutorial,
+    skipTutorial,
+    hasTutorialBeenSeen
+  } = useTutorial()
+  
   // Get debate data from URL parameters
   const opinionOfTheDay = searchParams.get('opinionOfTheDay') || "No topic provided"
   const personOpinion = searchParams.get('personOpinion') || "No opinion provided"
@@ -161,6 +172,15 @@ function VirtualDebateSimulationContent() {
       startDebate()
     }
   }, [debateStarted, topic, stance])
+
+  // Start tutorial when debate starts
+  useEffect(() => {
+    if (debateStarted && !hasTutorialBeenSeen('debate_simulator')) {
+      setTimeout(() => {
+        startTutorial('debate_simulator')
+      }, 2000)
+    }
+  }, [debateStarted])
 
   const addMessage = (persona: Persona, content: string, phase: DebatePhase) => {
     const newMessage: DebateMessage = {
@@ -403,25 +423,15 @@ Then provide detailed feedback explaining your decision, highlighting the strong
                 {currentPhase === "main" && <Badge variant="outline" className="text-xs sm:text-sm">Round {round}</Badge>}
                 <Button 
                   onClick={() => {
-                    setDebateStarted(false)
-                    setMessages([])
-                    setCurrentPhase("setup")
-                    setCurrentSpeaker("moderator")
-                    setRound(1)
-                    setScores({
-                      pro: { logic: 0, argumentation: 0, rebuttals: 0, engagement: 0 },
-                      con: { logic: 0, argumentation: 0, rebuttals: 0, engagement: 0 },
-                    })
-                    setIsGenerating(false)
-                    setWaitingForUser(false)
-                    setUserInput("")
-                    setUserPrompt("")
+                    // End debate and return to main page instead of starting new debate
+                    router.push('/')
                   }} 
                   variant="outline" 
                   size="sm"
                   className="text-xs"
+                  data-tutorial="end-debate-button"
                 >
-                  New Debate
+                  End Debate
                 </Button>
               </div>
             </div>
@@ -447,7 +457,7 @@ Then provide detailed feedback explaining your decision, highlighting the strong
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col p-2 sm:p-6 pt-0">
-                <div className="max-h-[60vh] sm:max-h-[70vh] lg:max-h-[75vh] overflow-y-auto space-y-3 sm:space-y-4 mb-3 sm:mb-4 min-h-[300px]">
+                <div className="max-h-[60vh] sm:max-h-[70vh] lg:max-h-[75vh] overflow-y-auto space-y-3 sm:space-y-4 mb-3 sm:mb-4 min-h-[300px]" data-tutorial="debate-interface">
                   {messages.map((message) => (
                     <div key={message.id} className="flex space-x-2 sm:space-x-3">
                       <div
@@ -457,7 +467,10 @@ Then provide detailed feedback explaining your decision, highlighting the strong
                         <span className="sm:hidden">{personaInfo[message.persona].name.split(' ')[0]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="bg-gray-50 rounded-lg p-3">
+                        <div 
+                          className="bg-gray-50 rounded-lg p-3"
+                          data-tutorial={message.persona === 'con' ? 'ai-response' : undefined}
+                        >
                           <p className="text-sm leading-relaxed text-gray-800 whitespace-pre-wrap break-words">{message.content}</p>
                         </div>
                         <div className="text-xs text-gray-500 mt-1 flex flex-col sm:flex-row sm:space-x-2">
@@ -504,6 +517,7 @@ Then provide detailed feedback explaining your decision, highlighting the strong
                         onChange={(e) => setUserInput(e.target.value)}
                         placeholder="Type your argument here..."
                         className="w-full min-h-[80px] text-sm resize-none"
+                        data-tutorial="response-input"
                         onKeyPress={(e) => {
                           if (e.key === 'Enter' && e.ctrlKey) {
                             handleUserSubmit()
@@ -690,6 +704,13 @@ Then provide detailed feedback explaining your decision, highlighting the strong
         </div>
       </div>
     </div>
+    
+    {/* Tutorial Component */}
+    <DebateSimulatorTutorial
+      isVisible={tutorialState.isVisible && tutorialState.currentTutorial === 'debate_simulator'}
+      onComplete={completeTutorial}
+      onSkip={skipTutorial}
+    />
   </div>
   )
 }

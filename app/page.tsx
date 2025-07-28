@@ -39,7 +39,9 @@ export default async function HomePage() {
           <div className="flex flex-col sm:flex-row justify-between items-center text-xs sm:text-sm text-gray-600 border-t border-b border-gray-300 py-2 px-2 sm:px-4 my-2 gap-2 sm:gap-0">
             <span>Vol. 1, No. 1</span>
             <span>{currentDate}</span>
-            <OpinionDropdown sectionName="Daily Opinion" currentPage="home" />
+            <div data-tutorial="opinion-dropdown">
+              <OpinionDropdown sectionName="Daily Opinion" currentPage="home" />
+            </div>
           </div>
         </header>
 
