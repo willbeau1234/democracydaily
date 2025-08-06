@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { AuthUser, UserProfile, OpinionResponse } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Camera, Upload, Save, Check, X, Users, Bell, UserCheck } from "lucide-react";
+import { Camera, Upload, Save, Check, X, Users, Bell, UserCheck, LogOut } from "lucide-react";
 import FireEmoji from '@/components/Fire';
 
 // User Summary Interface
@@ -1103,6 +1103,17 @@ export default function ProfileClient() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      console.log('✅ User logged out successfully');
+      router.push('/');
+    } catch (error) {
+      console.error('❌ Error logging out:', error);
+      alert('Error logging out. Please try again.');
+    }
+  };
+
   // Show loading during SSR or while auth is loading
   if (!isClient || loading) {
     return (
@@ -1139,14 +1150,25 @@ export default function ProfileClient() {
                 <h1 className="text-4xl font-bold font-mono tracking-tight text-black uppercase">{profile.displayName}</h1>
                 <p className="text-gray-600 text-lg font-mono mt-1">{profile.email}</p>
               </div>
-              <div className="text-right bg-gray-100 border-2 border-gray-300 p-3 rounded">
-                <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Member since</p>
-                <p className="text-black font-mono font-bold">
-                  {profile.createdAt ? 
-                    new Date(profile.createdAt.seconds * 1000).toLocaleDateString() : 
-                    'Recently'
-                  }
-                </p>
+              <div className="flex flex-col items-end gap-3">
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  size="sm"
+                  className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 font-mono font-bold uppercase tracking-wide"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Log Out
+                </Button>
+                <div className="text-right bg-gray-100 border-2 border-gray-300 p-3 rounded">
+                  <p className="text-gray-600 text-sm font-semibold uppercase tracking-wider">Member since</p>
+                  <p className="text-black font-mono font-bold">
+                    {profile.createdAt ? 
+                      new Date(profile.createdAt.seconds * 1000).toLocaleDateString() : 
+                      'Recently'
+                    }
+                  </p>
+                </div>
               </div>
             </div>
           </div>

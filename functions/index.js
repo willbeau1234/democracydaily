@@ -420,11 +420,11 @@ async function updateOpinionStats(opinionId) {
 }
 
 exports.midnightReset = functions.scheduler.onSchedule({
-  schedule: "0 6 * * *",  // 6 AM UTC = Midnight Chicago time
+  schedule: "59 23 * * *",  // 11:59 PM Chicago time
   timeZone: "America/Chicago",  // Use Chicago timezone directly
 }, async (context) => {
   try {
-    console.log("🕛 Starting midnight reset process...");
+    console.log("🕛 Starting 11:59 PM reset process...");
     
     // Get proper Chicago time for date calculations
     const chicagoTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}));
@@ -500,20 +500,20 @@ exports.midnightReset = functions.scheduler.onSchedule({
     // Commit all changes atomically
     await batch.commit();
     
-    console.log(`✅ Midnight reset completed successfully`);
+    console.log(`✅ 11:59 PM reset completed successfully`);
     console.log(`📊 Archived ${archivedCount} responses`);
     console.log(`🗑️ Deactivated ${deactivatedCount} previous opinions`);
 
     return {
       success: true, 
-      message: "Midnight reset completed successfully",
+      message: "11:59 PM reset completed successfully",
       activationResult,
       archivedResponses: archivedCount,
       deactivatedOpinions: deactivatedCount,
       resetDate: today
     };
   } catch (error) {
-    console.error("❌ Error in midnight reset:", error);
+    console.error("❌ Error in 11:59 PM reset:", error);
     return {success: false, error: error.message};
   }
 }); // ← This closes the midnightReset function
@@ -686,6 +686,113 @@ exports.triggerNextOpinion = functions.https.onRequest({
     res.status(500).json({success: false, error: error.message});
   }
 });
+
+/**
+ * Manual trigger for reset process (for testing)
+ */
+exports.triggerManualReset = functions.https.onRequest({
+  cors: true,
+}, async (req, res) => {
+  try {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    // Check for admin authorization
+    const {adminKey} = req.method === "GET" ? req.query : req.body;
+    if (adminKey !== "democracy-admin-2025") {
+      res.status(401).json({error: "Unauthorized - admin key required"});
+      return;
+    }
+
+    console.log("🛠️ Manual reset triggered by admin");
+    
+    // Call the same logic as the scheduled function
+    const chicagoTime = new Date(new Date().toLocaleString("en-US", {timeZone: "America/Chicago"}));
+    const today = chicagoTime.toISOString().split('T')[0];
+    
+    console.log(`📅 Today (Chicago): ${today}`);
+    console.log("🔄 Activating today's opinion...");
+    const activationResult = await activateNextOpinion();
+    console.log("✅ Opinion activation result:", activationResult);
+
+    console.log("🗂️ Deactivating previous opinions and archiving responses...");
+    
+    const batch = db.batch();
+    
+    // Deactivate all currently active opinions that are NOT today's
+    const opinionsRef = db.collection("dailyOpinions");
+    const activeOpinionsQuery = opinionsRef.where("isActive", "==", true);
+    const activeSnapshot = await activeOpinionsQuery.get();
+
+    let deactivatedCount = 0;
+    activeSnapshot.forEach((doc) => {
+      const data = doc.data();
+      
+      if (data.publishAt !== today) {
+        console.log(`🔽 Deactivating opinion from ${data.publishAt}`);
+        batch.update(doc.ref, {
+          isActive: false,
+          deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        deactivatedCount++;
+      }
+    });
+
+    // Archive responses from all previous days
+    const responsesRef = db.collection("responses");
+    const todayStart = new Date(chicagoTime);
+    todayStart.setHours(0, 0, 0, 0);
+    
+    console.log(`🗂️ Archiving responses before: ${todayStart.toISOString()}`);
+    
+    const previousResponses = await responsesRef
+      .where("timestamp", "<", admin.firestore.Timestamp.fromDate(todayStart))
+      .get();
+
+    const archiveRef = db.collection("archivedResponses");
+    let archivedCount = 0;
+    
+    previousResponses.forEach((doc) => {
+      const responseData = doc.data();
+      const archiveDoc = archiveRef.doc(doc.id);
+      batch.set(archiveDoc, {
+        ...responseData,
+        archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        archivedDate: today,
+        manualTrigger: true, // Mark as manually triggered
+      });
+      batch.delete(doc.ref);
+      archivedCount++;
+    });
+
+    await batch.commit();
+    
+    console.log(`✅ Manual reset completed successfully`);
+    console.log(`📊 Archived ${archivedCount} responses`);
+    console.log(`🗑️ Deactivated ${deactivatedCount} previous opinions`);
+
+    res.json({
+      success: true, 
+      message: "Manual reset completed successfully",
+      activationResult,
+      archivedResponses: archivedCount,
+      deactivatedOpinions: deactivatedCount,
+      resetDate: today,
+      manualTrigger: true
+    });
+
+  } catch (error) {
+    console.error("❌ Error in manual reset:", error);
+    res.status(500).json({success: false, error: error.message});
+  }
+});
+
 /**
  * Load opinions from local JSON file and upload to Firestore
  */

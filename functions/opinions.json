@@ -1,52 +1,84 @@
 {
-    "opinions": [
-     {
-        "content": "The health of our democracy depends not on our ability to agree, but on our willingness to disagree respectfully and our commitment to understanding why others think differently.",
-        "publishAt": "2025-06-15"
+  "opinions": [
+      {
+          "content": "When on a date, the person who initiated the date should pay, regardless of gender. Splitting the bill signals that the date went poorly and should be avoided.",
+          "publishAt": "2025-08-06"
       },
       {
-        "content": "The obsession with 'following your passion' is privileged garbage that's left an entire generation broke and disillusioned. Most people don't have some burning, monetizable passion waiting to be discovered - they have bills to pay and responsibilities to meet. This fairy tale that you should love what you do for work has created unrealistic expectations and made people feel like failures for having normal jobs that simply provide financial stability. The whole 'do what you love and you'll never work a day in your life' mantra is usually spouted by people who already had money or got lucky, ignoring the reality that most passions don't pay well and most well-paying jobs involve plenty of mundane, unglamorous work. People would be happier if they focused on developing competence in valuable skills, building financial security, and finding meaning outside of work instead of torturing themselves trying to turn every hobby into a career.",
-        "publishAt": "2025-06-16"
+          "content": "Most people who claim 'the book is better than the movie' are lying and just trying to sound intellectual. While books are often superior to their film adaptations, this blanket statement is frequently made by people who want to appear cultured rather than those who genuinely prefer the written version.",
+          "publishAt": "2025-08-07"
       },
       {
-        "content": "Social media platforms should be required by law to verify the identity of all users before allowing them to create accounts. This would reduce cyberbullying, misinformation, and online harassment while creating a more accountable digital environment.",
-        "publishAt": "2025-06-17"
+          "content": "Not everyone is a winner, and the culture of participation trophies is fundamentally harmful. Teaching children that they're winners regardless of effort or outcome leaves them ill-equipped to handle real-world setbacks. Sometimes little Billy needs to learn that life isn't all sunshine and rainbows.",
+          "publishAt": "2025-08-08"
       },
       {
-        "content": "Public schools should eliminate standardized testing entirely and instead use portfolio-based assessments that showcase student creativity, critical thinking, and real-world problem-solving skills.",
-        "publishAt": "2025-06-18"
+          "content": "Social media activism accomplishes very little beyond inflating egos and feeding savior complexes. It creates the illusion of meaningful action while rarely translating into real-world change that actually helps people.",
+          "publishAt": "2025-08-09"
       },
       {
-        "content": "Cities should ban all private vehicles from downtown areas and only allow public transportation, bicycles, and emergency vehicles to reduce pollution and create more walkable communities.",
-        "publishAt": "2025-06-19"
+          "content": "You shouldn't unfollow people on social media simply because of political disagreements. Surrounding yourself with an echo chamber of identical viewpoints stunts intellectual growth and contributes to societal polarization.",
+          "publishAt": "2025-08-10"
       },
       {
-        "content": "Employers should be legally required to offer a four-day work week with no reduction in pay, as studies show increased productivity and improved mental health outcomes for workers.",
-        "publishAt": "2025-06-20"
+          "content": "Aliens are real and have likely visited Earth, but found us uninteresting. In a universe this vast, intelligent life must exist elsewhere, and with billions of years for civilizations to develop before humans appeared, they've probably already discovered us and moved on to more fascinating worlds.",
+          "publishAt": "2025-08-11"
       },
       {
-        "content": "All restaurants should be required to display the complete nutritional information and calorie counts for every menu item, including detailed ingredient lists and allergen warnings.",
-        "publishAt": "2025-06-21"
+          "content": "If you stand for everything, you stand for nothing. I have no respect for people who agree with every cause and avoid taking firm positions. It's better to make a few enemies while standing for something meaningful than to be universally liked while believing in nothing.",
+          "publishAt": "2025-08-12"
       },
       {
-        "content": "Cryptocurrency should be banned entirely as it serves no legitimate purpose beyond speculation and causes massive environmental damage through energy consumption.",
-        "publishAt": "2025-06-22"
+          "content": "There should be no money in politics whatsoever. Campaign contributions should be banned entirely, and every candidate who gathers sufficient petition signatures should receive equal government funding for their campaign.",
+          "publishAt": "2025-08-13"
       },
       {
-        "content": "All college textbooks should be freely available online as public resources, funded by taxpayers, to eliminate the predatory textbook industry that exploits students.",
-        "publishAt": "2025-06-23"
+          "content": "People should start posting mundane, ordinary moments on social media instead of just highlight reels. The constant stream of curated happiness creates unrealistic expectations and doesn't reflect the reality of human experience.",
+          "publishAt": "2025-08-14"
       },
       {
-        "content": "Professional sports leagues should implement strict salary caps where no player can earn more than 10 times the median salary of essential workers like teachers and nurses.",
-        "publishAt": "2025-06-24"
+          "content": "Don't attend events out of politeness if you genuinely don't want to be there. If you're not enthusiastic about coming, I'd rather you stay home—your reluctant presence diminishes the experience for everyone involved.",
+          "publishAt": "2025-08-15"
       },
       {
-        "content": "All social media platforms should be legally required to show posts in chronological order only, banning algorithmic feeds that are designed to maximize engagement and addiction.",
-        "publishAt": "2025-06-25"
+          "content": "Brand loyalty is a scam that inflates prices and prevents consumers from discovering superior alternatives. Blind allegiance to brands often means paying premium prices for inferior products while ignoring better options.",
+          "publishAt": "2025-08-16"
       },
       {
-        "content": "Democracy works because it makes narcissists fight each other instead of letting one narcissist take over. They're too busy competing to control everything. Capitalism gives them a different way to win. making money and building businesses instead of starting wars. Both systems just redirect narcissists' need to be top dog into something less harmful.-The editor",
-        "publishAt": "2025-06-26"
+          "content": "Countries that complain about overtourism while depending on tourism revenue are fundamentally ungrateful. If tourism is your primary economic driver, you have no right to resent the very visitors who sustain your economy.",
+          "publishAt": "2025-08-17"
+      },
+      {
+          "content": "iPad tipping prompts should be illegal, or at minimum shouldn't include preset percentage options. Why should I tip 22% on a microwaved pretzel when no actual service was provided?",
+          "publishAt": "2025-08-18"
+      },
+      {
+          "content": "People should eliminate their lawns entirely. These ecological deserts waste water, require harmful chemicals, and provide zero environmental benefit while consuming countless hours of maintenance time.",
+          "publishAt": "2025-08-19"
+      },
+      {
+          "content": "You should not start a podcast. The market is oversaturated with mediocre content, and unless you have genuine expertise or a truly unique perspective, you're just adding to the noise.",
+          "publishAt": "2025-08-20"
+      },
+      {
+          "content": "Celebrities should be allowed to participate in political discussions without being automatically discredited. Having fame doesn't invalidate someone's right to express political opinions or eliminate their capacity for informed commentary.",
+          "publishAt": "2025-08-21"
+      },
+      {
+          "content": "We should be extremely cautious about AI chatbots and romantic relationships with artificial intelligence. Society is heading straight toward the dystopian scenario depicted in 'Her,' and this technological intimacy is deeply concerning.",
+          "publishAt": "2025-08-22"
+      },
+      {
+          "content": "Local politics matter significantly more than national politics for most people's daily lives. Your city council decisions affect your immediate environment far more than federal legislation, yet people obsess over national politics while ignoring local elections.",
+          "publishAt": "2025-08-23"
+      },
+      {
+          "content": "Suburbs should be eliminated in favor of denser, more sustainable urban planning. Suburban sprawl is environmentally destructive, economically inefficient, and creates car-dependent communities that isolate residents from meaningful social interaction.",
+          "publishAt": "2025-08-24"
+      },
+      {
+          "content": "There should be daily limits on AI usage to prevent over-dependence and maintain human cognitive abilities. Unlimited access to AI assistance risks atrophying our problem-solving skills and critical thinking capabilities.",
+          "publishAt": "2025-08-25"
       }
-    ]
-  }
+  ]
+}
